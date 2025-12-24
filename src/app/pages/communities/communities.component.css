@@ -1,0 +1,110 @@
+.communities-page {
+  padding: 2rem;
+  background: linear-gradient(to right, #f8f8f8 0%, #f0e9ff 100%);
+  min-height: calc(100vh - 80px);
+}
+
+.page-title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #2d2d2d;
+  margin-bottom: 2rem;
+}
+
+.communities-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 2rem;
+}
+
+.community-card {
+  background: #ffffff;
+  border-radius: 1.5rem;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+
+.community-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.community-image-container {
+  width: 100%;
+  height: 200px;
+  overflow: hidden;
+  position: relative;
+}
+
+.community-image-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 50%;
+  height: 50%;
+  background: linear-gradient(135deg, #f0e9ff 0%, #f8f8f8 100%);
+  pointer-events: none;
+  z-index: 1;
+  border-radius: 0 1.5rem 0 0;
+}
+
+.community-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  position: relative;
+  z-index: 2;
+}
+
+.community-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 60%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.community-card.gradient-purple::before {
+  background: linear-gradient(to bottom, rgba(139, 92, 246, 0.1), transparent);
+}
+
+.community-card.gradient-blue::before {
+  background: linear-gradient(to bottom, rgba(59, 130, 246, 0.1), transparent);
+}
+
+.community-card.gradient-green::before {
+  background: linear-gradient(to bottom, rgba(34, 197, 94, 0.1), transparent);
+}
+
+.community-info {
+  padding: 1.5rem;
+  position: relative;
+  z-index: 2;
+  background: linear-gradient(to bottom, transparent, #ffffff);
+}
+
+
+.community-name {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #2d2d2d;
+  margin: 0 0 0.5rem 0;
+}
+
+.community-projects {
+  font-size: 1rem;
+  color: #6b46c1;
+  font-weight: 500;
+  margin: 0;
+}
+

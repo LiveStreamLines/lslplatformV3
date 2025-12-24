@@ -1,0 +1,166 @@
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 2rem;
+  background: #ffffff;
+  border-bottom: 1px solid #e5e5e5;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.logo-section {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.emaar-logo-img {
+  width: 157px;
+  height: 45px;
+  object-fit: contain;
+}
+
+.emaar-logo {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #2d2d2d;
+  margin: 0;
+}
+
+.powered-by {
+  font-size: 0.75rem;
+  color: #666;
+  text-transform: uppercase;
+}
+
+.isl-logo {
+  font-size: 0.875rem;
+  color: #2d2d2d;
+  font-weight: 500;
+}
+
+.header-nav {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 2rem;
+  text-decoration: none;
+  color: #666;
+  font-size: 0.875rem;
+  transition: all 0.3s ease;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.nav-item:hover {
+  background: #f5f5f5;
+}
+
+.nav-item.active {
+  background: #6b46c1;
+  color: #ffffff;
+}
+
+.nav-icon-img {
+  width: 12px;
+  height: 12px;
+  object-fit: contain;
+}
+
+.nav-icon {
+  font-size: 1rem;
+}
+
+.nav-label {
+  font-weight: 500;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.search-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+  transition: opacity 0.3s ease;
+}
+
+.search-btn:hover {
+  opacity: 0.7;
+}
+
+.search-icon-img {
+  width: 15px;
+  height: 15px;
+  object-fit: contain;
+}
+
+.user-profile {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.5rem;
+  transition: background 0.3s ease;
+}
+
+.user-profile:hover {
+  background: #f5f5f5;
+}
+
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #e5e5e5;
+}
+
+.user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.user-name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #2d2d2d;
+}
+
+.user-role {
+  font-size: 0.75rem;
+  color: #666;
+}
+
+.dropdown-arrow {
+  font-size: 0.75rem;
+  color: #666;
+}
+

@@ -1,0 +1,86 @@
+<div class="projects-page">
+  <div class="page-header">
+    <div class="breadcrumb">
+      <span class="breadcrumb-item">All Projects</span>
+      <span class="breadcrumb-separator">|</span>
+      <span class="breadcrumb-item active">{{ selectedCategory }}</span>
+    </div>
+    <div class="view-toggle">
+      <button 
+        [class.active]="viewMode === 'list'"
+        (click)="toggleView('list')"
+        class="view-btn">
+        <span class="view-icon">📋</span>
+        <span class="view-label">List</span>
+      </button>
+      <button 
+        [class.active]="viewMode === 'map'"
+        (click)="toggleView('map')"
+        class="view-btn">
+        <span class="view-icon">🗺️</span>
+        <span class="view-label">Map</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="projects-grid" *ngIf="viewMode === 'list'">
+    <div 
+      *ngFor="let project of projects" 
+      class="project-card"
+      [class.has-active-feature]="project.timeLapsActive">
+      <div class="card-header">
+        <h3 class="project-name">{{ project.name }}</h3>
+      </div>
+      
+      <div class="card-image-container">
+        <img [src]="project.image" [alt]="project.name" class="project-image" />
+        <span class="status-badge">{{ project.status }}</span>
+      </div>
+
+      <div class="card-progress">
+        <div class="progress-info">
+          <span class="progress-text">{{ project.daysCompleted }} Days Completed</span>
+        </div>
+        <div class="progress-bar-container">
+          <div class="progress-bar">
+            <div 
+              class="progress-fill"
+              [style.width.%]="getProgressPercentage(project.daysCompleted, project.totalDays)">
+            </div>
+          </div>
+          <div class="progress-labels">
+            <span>0</span>
+            <span>{{ project.totalDays }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-actions">
+        <button class="action-btn" [class.active]="project.timeLapsActive" title="Time laps">
+          <img [src]="icons.clock.enable" alt="Time laps" class="action-icon-img" />
+          <div class="active-indicator" *ngIf="project.timeLapsActive">
+            <span class="indicator-text">Time laps</span>
+            <span class="active-badge">ACTIVE</span>
+          </div>
+        </button>
+        <button class="action-btn" title="Live">
+          <img [src]="icons.live.enable" alt="Live" class="action-icon-img" />
+        </button>
+        <button class="action-btn" title="Drone">
+          <img [src]="icons.drone.enable" alt="Drone" class="action-icon-img" />
+        </button>
+        <button class="action-btn" title="Satellite">
+          <img [src]="icons.satellite.enable" alt="Satellite" class="action-icon-img" />
+        </button>
+        <button class="action-btn" title="Camera">
+          <img [src]="icons.camera.enable" alt="Camera" class="action-icon-img" />
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="map-view" *ngIf="viewMode === 'map'">
+    <p>Map view coming soon...</p>
+  </div>
+</div>
+

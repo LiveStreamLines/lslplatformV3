@@ -1,0 +1,81 @@
+.overlay-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.overlay-backdrop.open {
+  opacity: 1;
+  visibility: visible;
+}
+
+.overlay-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 75%;
+  height: 100%;
+  background: #f8f8f8;
+  transform: translateX(100%);
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15);
+}
+
+.overlay-panel.open {
+  transform: translateX(0);
+}
+
+.overlay-header {
+  padding: 1rem 2rem;
+  background: #ffffff;
+  border-bottom: 1px solid #e5e5e5;
+  display: flex;
+  align-items: center;
+}
+
+.close-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #2d2d2d;
+  font-size: 1rem;
+  padding: 0.5rem;
+  transition: color 0.3s ease;
+}
+
+.close-btn:hover {
+  color: #6b46c1;
+}
+
+.close-btn span:first-child {
+  font-size: 1.25rem;
+  font-weight: 300;
+}
+
+.overlay-content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.main-content {
+  flex: 1;
+  width: 100%;
+  overflow-y: auto;
+  background: #f8f8f8;
+}
+

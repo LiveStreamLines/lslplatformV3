@@ -1,0 +1,20 @@
+<div 
+  class="overlay-backdrop" 
+  [class.open]="isOpen"
+  (click)="onBackdropClick($event)">
+  <div class="overlay-panel" [class.open]="isOpen">
+    <div class="overlay-header">
+      <button class="close-btn" (click)="onClose()">
+        <span>✕</span>
+        <span>Close</span>
+      </button>
+    </div>
+    
+    <div class="overlay-content">
+      <div class="main-content">
+        <app-projects [selectedCategory]="selectedCategory"></app-projects>
+      </div>
+    </div>
+  </div>
+</div>
+
