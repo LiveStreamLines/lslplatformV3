@@ -19,16 +19,26 @@ export class HeaderComponent implements OnInit {
   };
 
   emaarLogo = EMAAR_LOGO;
+  lslLogo = 'assets/images/lsl.svg';
+  chevronIcon = 'assets/images/icons/chevron-down.svg';
   searchIcon = NAV_ICONS.search;
+  navIcons = NAV_ICONS;
   
   navItems = [
-    { label: 'Home', route: '/communities', icon: NAV_ICONS.home, active: false },
-    { label: 'Projects', route: '/projects', icon: NAV_ICONS.home, active: false },
-    { label: 'Monitor', route: '/monitor', icon: NAV_ICONS.monitor, active: false },
-    { label: 'Chat', route: '/chat', icon: NAV_ICONS.chat, active: false },
-    { label: 'Contact', route: '/contact', icon: NAV_ICONS.contact, active: false },
-    { label: 'Settings', route: '/settings', icon: NAV_ICONS.settings, active: false }
+    { label: 'Communities', route: '/communities', iconKey: 'home', active: false },
+    { label: 'Monitor', route: '/monitor', iconKey: 'monitor', active: false },
+    { label: 'Chat', route: '/chat', iconKey: 'chat', active: false },
+    { label: 'Contact', route: '/contact', iconKey: 'contact', active: false },
+    { label: 'Settings', route: '/settings', iconKey: 'settings', active: false }
   ];
+
+  getIconUrl(iconKey: string, isActive: boolean): string {
+    const icon = this.navIcons[iconKey as keyof typeof NAV_ICONS];
+    if (typeof icon === 'string') {
+      return icon; // For search icon
+    }
+    return isActive ? icon.filled : icon.outline;
+  }
 
   constructor(private router: Router) {}
 

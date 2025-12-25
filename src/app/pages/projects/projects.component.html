@@ -57,23 +57,23 @@
 
       <div class="card-actions">
         <button class="action-btn" [class.active]="project.timeLapsActive" title="Time laps">
-          <img [src]="icons.clock.enable" alt="Time laps" class="action-icon-img" />
+          <img [src]="project.timeLapsActive ? icons.clock.enable : icons.clock.disable" alt="Time laps" class="action-icon-img" />
           <div class="active-indicator" *ngIf="project.timeLapsActive">
             <span class="indicator-text">Time laps</span>
             <span class="active-badge">ACTIVE</span>
           </div>
         </button>
         <button class="action-btn" title="Live">
-          <img [src]="icons.live.enable" alt="Live" class="action-icon-img" />
+          <img [src]="icons.live.disable" alt="Live" class="action-icon-img" />
         </button>
         <button class="action-btn" title="Drone">
-          <img [src]="icons.drone.enable" alt="Drone" class="action-icon-img" />
+          <img [src]="icons.drone.disable" alt="Drone" class="action-icon-img" />
         </button>
         <button class="action-btn" title="Satellite">
-          <img [src]="icons.satellite.enable" alt="Satellite" class="action-icon-img" />
+          <img [src]="icons.satellite.disable" alt="Satellite" class="action-icon-img" />
         </button>
         <button class="action-btn" title="Camera">
-          <img [src]="icons.camera.enable" alt="Camera" class="action-icon-img" />
+          <img [src]="icons.camera.disable" alt="Camera" class="action-icon-img" />
         </button>
       </div>
     </div>

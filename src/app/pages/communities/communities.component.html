@@ -1,20 +1,35 @@
 <div class="communities-page">
-  <h1 class="page-title">Communities</h1>
-  
-  <div class="communities-grid">
-    <div 
-      *ngFor="let community of communities" 
-      class="community-card"
-      (click)="onCommunityClick(community)"
-      [class.gradient-purple]="community.gradient === 'purple'"
-      [class.gradient-blue]="community.gradient === 'blue'"
-      [class.gradient-green]="community.gradient === 'green'">
-      <div class="community-image-container">
-        <img [src]="community.image" [alt]="community.name" class="community-image" />
+  <div class="communities-container">
+    <h1 class="page-title">Communities</h1>
+    
+    <div class="communities-grid">
+      <div class="communities-row">
+        <div 
+          *ngFor="let community of communities.slice(0, 3)" 
+          class="community-card"
+          (click)="onCommunityClick(community)">
+          <div class="community-image-container">
+            <img [src]="community.image" [alt]="community.name" class="community-image" />
+          </div>
+          <div class="community-info">
+            <h2 class="community-name">{{ community.name }}</h2>
+            <p class="community-projects">{{ community.projectCount }} Projects</p>
+          </div>
+        </div>
       </div>
-      <div class="community-info">
-        <h2 class="community-name">{{ community.name }}</h2>
-        <p class="community-projects">{{ community.projectCount }} Projects</p>
+      <div class="communities-row">
+        <div 
+          *ngFor="let community of communities.slice(3, 6)" 
+          class="community-card"
+          (click)="onCommunityClick(community)">
+          <div class="community-image-container">
+            <img [src]="community.image" [alt]="community.name" class="community-image" />
+          </div>
+          <div class="community-info">
+            <h2 class="community-name">{{ community.name }}</h2>
+            <p class="community-projects">{{ community.projectCount }} Projects</p>
+          </div>
+        </div>
       </div>
     </div>
   </div>

@@ -1,0 +1,148 @@
+server {
+    # Listen for HTTPS traffic
+    listen 443 ssl;
+    server_name 192.168.1.101;
+
+    client_max_body_size 50M;
+    # Paths to the self-signed SSL certificate and private key
+    ssl_certificate /etc/ssl/certs/nginx-selfsigned.crt;
+    ssl_certificate_key /etc/ssl/private/nginx-selfsigned.key;
+
+    # Strong SSL security settings
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+    ssl_ciphers "EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH";
+
+    # Serve /hik files directly from /var/www/hik
+    location /hik/ {
+        root /var/www;
+        index gugg1.html demo.htm;
+        try_files $uri $uri/ =404;
+
+        # Enable COOP/COEP so SharedArrayBuffer is available
+        add_header Cross-Origin-Opener-Policy "same-origin" always;
+        add_header Cross-Origin-Embedder-Policy "require-corp" always;
+        add_header Cross-Origin-Resource-Policy "cross-origin" always;
+        add_header Access-Control-Allow-Origin "*" always;
+        add_header Access-Control-Allow-Methods "GET, OPTIONS" always;
+        add_header Access-Control-Allow-Headers "*" always;
+        add_header Access-Control-Allow-Credentials "false" always;
+        add_header X-Content-Type-Options "nosniff" always;
+
+        add_header Content-Security-Policy "frame-ancestors 'self' http://localhost http://localhost:4200 https://localhost https://localhost:4200" always;
+        add_header X-Frame-Options "" always;
+    }
+
+    location /livefeed/ {
+        alias /var/www/livefeed-app/;
+        try_files $uri $uri/ /livefeed/index.html;
+
+        # Ensure the app (and all subresources) are cross-origin isolated
+        add_header Cross-Origin-Opener-Policy "same-origin" always;
+        add_header Cross-Origin-Embedder-Policy "require-corp" always;
+        add_header Cross-Origin-Resource-Policy "same-origin" always;
+        add_header X-Content-Type-Options "nosniff" always;
+
+        # Allow the app to be framed only by itself
+        add_header Content-Security-Policy "frame-ancestors 'self'" always;
+    }
+
+    # Operation
+    location /operation/ {
+        alias /var/www/operation/;
+        index index.html;
+        try_files $uri $uri/ /operation/index.html;
+
+        # Security headers
+        add_header Cross-Origin-Opener-Policy "same-origin" always;
+        add_header Cross-Origin-Embedder-Policy "require-corp" always;
+        add_header Cross-Origin-Resource-Policy "same-origin" always;
+        add_header X-Content-Type-Options "nosniff" always;
+    } 
+    
+    # Operation
+    location /v2/ {
+        alias /var/www/v2/;
+        index index.html;
+        try_files $uri $uri/ /v2/index.html;
+
+        # Security headers
+        add_header Cross-Origin-Opener-Policy "same-origin" always;
+        add_header Cross-Origin-Embedder-Policy "require-corp" always;
+        add_header Cross-Origin-Resource-Policy "same-origin" always;
+        add_header X-Content-Type-Options "nosniff" always;
+    }
+ 
+    # Mobile Angular app serving from /var/www/mobile
+    location /mobile/ {
+        alias /var/www/mobile/;
+        index index.html;
+        try_files $uri $uri/ /mobile/index.html;
+
+        # Security headers
+        add_header Cross-Origin-Opener-Policy "same-origin" always;
+        add_header Cross-Origin-Embedder-Policy "require-corp" always;
+        add_header Cross-Origin-Resource-Policy "same-origin" always;
+        add_header X-Content-Type-Options "nosniff" always;
+    }
+    
+    # Angular app serving
+    location / {
+	root /var/www/platform;
+        index index.html;
+        try_files $uri /index.html;
+
+        add_header Cross-Origin-Embedder-Policy "require-corp" always;
+        add_header Cross-Origin-Opener-Policy "same-origin" always;
+        add_header Cross-Origin-Resource-Policy "same-origin" always;
+        add_header X-Content-Type-Options "nosniff" always;
+    }
+
+    location /backend/ {
+        proxy_pass http://127.0.0.1:5000/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /proxy/ {
+        proxy_pass http://127.0.0.1:3000/proxy;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /camera-backend/ {
+        proxy_pass http://127.0.0.1:9000/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /newplatform/ {
+        proxy_pass http://127.0.0.1:4200/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /stream/ {
+        proxy_pass http://127.0.0.1:9500/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+	
+    error_page 404 /index.html;
+    # Enable gzip compression for better performance
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
+    gzip_proxied any;
+    gzip_min_length 1000;
+}
+

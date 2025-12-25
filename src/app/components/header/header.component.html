@@ -2,9 +2,11 @@
   <div class="header-left">
     <div class="logo-section">
       <img [src]="emaarLogo" alt="EMAAR" class="emaar-logo-img" />
-      <h1 class="emaar-logo">EMAAR</h1>
-      <span class="powered-by">POWERED BY</span>
-      <span class="isl-logo">ISL Live Stream Lines</span>
+      <div class="divider-line"></div>
+      <div class="powered-by-section">
+        <span class="powered-by-text">POWERED BY</span>
+        <img [src]="lslLogo" alt="LSL" class="lsl-logo-img" />
+      </div>
     </div>
   </div>
   
@@ -14,7 +16,7 @@
       [routerLink]="item.route"
       [class.active]="item.active"
       class="nav-item">
-      <img [src]="item.icon" [alt]="item.label" class="nav-icon-img" />
+      <img [src]="getIconUrl(item.iconKey, item.active)" [alt]="item.label" class="nav-icon-img" />
       <span class="nav-label">{{ item.label }}</span>
     </a>
   </nav>
@@ -29,7 +31,7 @@
         <span class="user-name">{{ currentUser.name }}</span>
         <span class="user-role">{{ currentUser.role }}</span>
       </div>
-      <span class="dropdown-arrow">▼</span>
+      <img [src]="chevronIcon" alt="Dropdown" class="chevron-icon" />
     </div>
   </div>
 </header>
