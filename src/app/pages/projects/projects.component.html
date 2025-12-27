@@ -25,7 +25,12 @@
     <div 
       *ngFor="let project of projects" 
       class="project-card"
-      [class.has-active-feature]="project.timeLapsActive">
+      [class.has-active-feature]="project.timeLapsActive"
+      (click)="navigateToProject(project.id)"
+      [attr.role]="'link'"
+      [attr.tabindex]="0"
+      (keydown.enter)="navigateToProject(project.id)"
+      (keydown.space)="navigateToProject(project.id); $event.preventDefault()">
       <div class="card-header">
         <h3 class="project-name">{{ project.name }}</h3>
       </div>
@@ -52,24 +57,24 @@
         </div>
       </div>
 
-      <div class="card-actions">
-        <button class="action-btn" [class.active]="project.timeLapsActive" title="Time laps">
+      <div class="card-actions" (click)="$event.stopPropagation()">
+        <button class="action-btn" [class.active]="project.timeLapsActive" title="Time laps" (click)="$event.stopPropagation()">
           <img [src]="project.timeLapsActive ? icons.clock.enable : icons.clock.disable" alt="Time laps" class="action-icon-img" />
           <div class="active-indicator" *ngIf="project.timeLapsActive">
             <span class="indicator-text">Time laps</span>
             <span class="active-badge">ACTIVE</span>
           </div>
         </button>
-        <button class="action-btn" title="Live">
+        <button class="action-btn" title="Live" (click)="$event.stopPropagation()">
           <img [src]="icons.live.disable" alt="Live" class="action-icon-img" />
         </button>
-        <button class="action-btn" title="Drone">
+        <button class="action-btn" title="Drone" (click)="$event.stopPropagation()">
           <img [src]="icons.drone.disable" alt="Drone" class="action-icon-img" />
         </button>
-        <button class="action-btn" title="Satellite">
+        <button class="action-btn" title="Satellite" (click)="$event.stopPropagation()">
           <img [src]="icons.satellite.disable" alt="Satellite" class="action-icon-img" />
         </button>
-        <button class="action-btn" title="Camera">
+        <button class="action-btn" title="Camera" (click)="$event.stopPropagation()">
           <img [src]="icons.camera.disable" alt="Camera" class="action-icon-img" />
         </button>
       </div>

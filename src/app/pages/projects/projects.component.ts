@@ -1,5 +1,6 @@
 import { Component, Input, OnInit, OnChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Router } from '@angular/router';
 import { PROJECT_IMAGE, ICONS } from '../../constants/figma-assets';
 
 @Component({
@@ -14,6 +15,8 @@ export class ProjectsComponent implements OnInit, OnChanges {
   viewMode: 'list' | 'map' = 'list';
   
   icons = ICONS;
+
+  constructor(private router: Router) {}
 
   projects = [
     {
@@ -69,6 +72,10 @@ export class ProjectsComponent implements OnInit, OnChanges {
 
   getProgressPercentage(daysCompleted: number, totalDays: number): number {
     return (daysCompleted / totalDays) * 100;
+  }
+
+  navigateToProject(projectId: number) {
+    this.router.navigate(['/project', projectId]);
   }
 
   ngOnInit() {

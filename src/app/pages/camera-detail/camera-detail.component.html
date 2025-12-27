@@ -1,0 +1,160 @@
+<div class="camera-detail-page">
+  <!-- Action Bar -->
+  <div class="action-bar">
+    <div class="camera-info">
+      <h2 class="camera-title">
+        {{ cameraName }}
+        <span class="status-dot">•</span>
+      </h2>
+      <div class="status-badge" [class.status-active]="cameraStatus === 'Active'" 
+           [class.status-error]="cameraStatus === 'Error'"
+           [class.status-maintenance]="cameraStatus === 'Maintenance'">
+        {{ cameraStatus }}
+      </div>
+    </div>
+    <div class="action-buttons">
+      <button class="action-btn">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M4 8H12M8 4V12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <span>Compare</span>
+      </button>
+      <button class="action-btn">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M8 2L10 6L14 7L10 8L8 12L6 8L2 7L6 6L8 2Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>Studio</span>
+      </button>
+      <button class="action-btn">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M3 4L8 2L13 4V8C13 11.314 10.314 14 7 14C3.686 14 1 11.314 1 8V4L6 2L11 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>Generate Video</span>
+      </button>
+      <button class="action-btn">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M5 8L7 10L11 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>Generate Image</span>
+      </button>
+      <button class="action-btn">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M2 4H14V12H2V4Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M6 2V6M10 2V6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <span>Slideshow</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="main-content">
+    <div class="content-wrapper">
+      <!-- Left Sidebar - Weather Info -->
+      <div class="weather-sidebar">
+        <div class="weather-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2V4M12 20V22M4 12H2M6.314 6.314L4.9 4.9M17.686 17.686L19.1 19.1M22 12H20M17.686 6.314L19.1 4.9M6.314 17.686L4.9 19.1" stroke="#FFE2A3" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="12" cy="12" r="4" stroke="#FFE2A3" stroke-width="2"/>
+          </svg>
+        </div>
+        <div class="weather-info">
+          <div class="weather-item">
+            <p class="weather-label">Humidity</p>
+            <p class="weather-value">{{ humidity }}</p>
+          </div>
+          <div class="weather-divider"></div>
+          <div class="weather-item">
+            <p class="weather-label">Temp.</p>
+            <p class="weather-value">{{ temperature }}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Center - Image Carousel -->
+      <div class="image-carousel-container">
+        <div class="carousel-images">
+          <div *ngFor="let image of images; let i = index" 
+               class="carousel-image" 
+               [class.active]="i === currentImageIndex"
+               [class.prev]="i < currentImageIndex"
+               [class.next]="i > currentImageIndex">
+            <img [src]="image" [alt]="'Image ' + (i + 1)" />
+          </div>
+        </div>
+        <button class="fullscreen-btn" (click)="fullscreenImage()">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M2 2H6V6M14 2H10V6M14 14H10V10M2 14H6V10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <div class="carousel-navigation">
+          <button class="nav-arrow nav-prev" (click)="previousImage()" [disabled]="currentImageIndex === 0">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M10 3L5 8L10 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          <button class="nav-arrow nav-next" (click)="nextImage()" [disabled]="currentImageIndex === images.length - 1">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M6 3L11 8L6 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Right Sidebar - Actions -->
+      <div class="actions-sidebar">
+        <button class="sidebar-action-btn">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 15V3M12 15L8 11M12 15L16 11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M2 17L2 19C2 20.105 2.895 21 4 21L20 21C21.105 21 22 20.105 22 19L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <button class="sidebar-action-btn">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M18 8C18 6.939 17.578 5.922 16.828 5.172C16.078 4.422 15.061 4 14 4C13.312 4 12.644 4.167 12.05 4.48C11.456 4.793 10.955 5.243 10.586 5.793C10.217 6.343 9.992 6.976 9.93 7.636C9.868 8.296 9.97 8.964 10.228 9.58C10.486 10.196 10.892 10.743 11.414 11.172C11.936 11.601 12.56 11.9 13.23 12.045" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M18 8L14 12L10 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <button class="sidebar-action-btn">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M6 9V2H18V9M6 18H4C2.895 18 2 17.105 2 16V11C2 9.895 2.895 9 4 9H20C21.105 9 22 9.895 22 11V16C22 17.105 21.105 18 20 18H18M6 18V22H18V18M6 18H18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Bottom Controls -->
+    <div class="bottom-controls">
+      <div class="date-time-controls">
+        <div class="date-picker">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="2" y="3" width="12" height="11" rx="2" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M5 1V4M11 1V4M2 7H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <span>{{ selectedDate }}</span>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M4 6L8 10L12 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="time-picker">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M8 4V8L10 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <span>{{ selectedTime }}</span>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M4 6L8 10L12 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+      </div>
+      <button class="slider-btn">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="3" width="12" height="11" rx="2" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M5 1V4M11 1V4M2 7H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <span>Slider</span>
+      </button>
+    </div>
+  </div>
+</div>

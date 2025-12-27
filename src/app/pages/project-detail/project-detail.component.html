@@ -1,0 +1,235 @@
+<div class="project-detail-page">
+  <!-- Breadcrumb -->
+  <div class="breadcrumb-section">
+    <button class="back-btn" routerLink="/communities">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M7.5 9L4.5 6L7.5 3" stroke="#9aa4b2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+    <div class="breadcrumb">
+      <span class="breadcrumb-item">emaar</span>
+      <svg class="breadcrumb-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M4.5 3L7.5 6L4.5 9" stroke="#9aa4b2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="breadcrumb-item">{{ communityName }}</span>
+      <svg class="breadcrumb-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M4.5 3L7.5 6L4.5 9" stroke="#9aa4b2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="breadcrumb-item active">{{ projectName }}</span>
+    </div>
+  </div>
+
+  <!-- Project Header Banner -->
+  <div class="project-header-banner">
+    <div class="banner-image" [style.background-image]="'url(' + bannerImage + ')'">
+      <div class="banner-overlay"></div>
+    </div>
+    <div class="banner-content">
+      <h1 class="project-title">{{ projectName }}</h1>
+      <div class="progress-section">
+        <div class="progress-info">
+          <span class="progress-days">{{ daysCompleted }} Days Completed</span>
+          <div class="progress-bar-wrapper">
+            <div class="progress-bar-line"></div>
+            <div class="progress-bar-fill" [style.width.px]="getProgressWidth()"></div>
+          </div>
+          <div class="progress-labels">
+            <span>0</span>
+            <span>{{ totalDays }}</span>
+          </div>
+        </div>
+        <div class="progress-percentage">{{ progressPercentage }}%</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs Section -->
+  <div class="tabs-section">
+    <div class="tab-bar">
+      <button 
+        [class.active]="activeTab === 'timelaps'"
+        (click)="setActiveTab('timelaps')"
+        class="tab-item">
+        <img src="assets/images/icons/project-actions-svg/clock-enable.svg" alt="Timelaps" class="tab-icon" />
+        <span>Timelaps</span>
+      </button>
+      <button 
+        [class.active]="activeTab === 'live'"
+        (click)="setActiveTab('live')"
+        class="tab-item">
+        <img src="assets/images/icons/project-actions-svg/live-enable.svg" alt="Live" class="tab-icon" />
+        <span>Live</span>
+      </button>
+      <button 
+        [class.active]="activeTab === 'satellite'"
+        (click)="setActiveTab('satellite')"
+        class="tab-item">
+        <img src="assets/images/icons/project-actions-svg/satellite-enable.svg" alt="Satellite" class="tab-icon" />
+        <span>Satellite Image</span>
+      </button>
+      <button 
+        [class.active]="activeTab === 'gallery'"
+        (click)="setActiveTab('gallery')"
+        class="tab-item">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" class="tab-icon">
+          <path d="M2 2H6L8 4H14V14H2V2Z" stroke="#4b5565" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="7" cy="7" r="2" stroke="#4b5565" stroke-width="1.5"/>
+        </svg>
+        <span>Gallery</span>
+      </button>
+    </div>
+
+    <!-- Camera Section -->
+    <div class="camera-section">
+      <div class="camera-header">
+        <h2 class="camera-count">{{ cameras.length }} Cameras</h2>
+        <div class="view-toggle">
+          <button 
+            [class.active]="viewMode === 'list'"
+            (click)="setViewMode('list')"
+            class="view-btn">
+            <span>List</span>
+          </button>
+          <button 
+            [class.active]="viewMode === 'map'"
+            (click)="setViewMode('map')"
+            class="view-btn">
+            <span>Map</span>
+          </button>
+          <button 
+            [class.active]="viewMode === 'slideshow'"
+            (click)="setViewMode('slideshow')"
+            class="view-btn">
+            <span>Slideshow</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="cameras-grid" *ngIf="viewMode === 'list'">
+        <div 
+          *ngFor="let camera of cameras"
+          class="camera-card"
+          (mouseenter)="onCameraHover(camera.id)"
+          (mouseleave)="onCameraLeave()"
+          [class.hovered]="hoveredCameraId === camera.id">
+          <div class="camera-status-badge" [class]="'status-' + camera.status.toLowerCase()">
+            {{ camera.status }}
+          </div>
+          
+          <h3 class="camera-name">
+            {{ camera.name }}
+            <span class="status-dot active">•</span>
+          </h3>
+          
+          <div class="camera-image-container">
+            <img [src]="camera.image" [alt]="camera.name" class="camera-image" />
+            <div class="quick-view-overlay" *ngIf="hoveredCameraId === camera.id">
+              <button class="quick-view-btn" (click)="openQuickView(camera, $event)">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M8 3C4.5 3 1.73 5.11 0 8C1.73 10.89 4.5 13 8 13C11.5 13 14.27 10.89 16 8C14.27 5.11 11.5 3 8 3ZM8 11C6.34 11 5 9.66 5 8C5 6.34 6.34 5 8 5C9.66 5 11 6.34 11 8C11 9.66 9.66 11 8 11Z" fill="#5621d2"/>
+                </svg>
+                <span>Quick View</span>
+              </button>
+            </div>
+          </div>
+          
+          <div class="camera-details">
+            <div class="detail-item">
+              <p class="detail-label">Installed on</p>
+              <p class="detail-value">{{ camera.installedDate }}</p>
+            </div>
+            <div class="detail-item">
+              <p class="detail-label">Last Photo</p>
+              <p class="detail-value">{{ camera.lastPhotoDate }}</p>
+            </div>
+          </div>
+          
+          <button class="view-details-btn" [routerLink]="['/camera', camera.id]">View Details</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Quick View Overlay -->
+<div 
+  class="quick-view-backdrop" 
+  [class.open]="isQuickViewOpen"
+  (click)="onQuickViewBackdropClick($event)">
+  <div class="quick-view-panel" [class.open]="isQuickViewOpen" (click)="$event.stopPropagation()">
+    <div class="quick-view-content-wrapper">
+      <div class="quick-view-header">
+        <button class="quick-view-close-btn" (click)="closeQuickView()">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 4L4 12M4 4L12 12" stroke="#121926" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span class="close-text">Close</span>
+        </button>
+        <div class="quick-view-breadcrumb">
+          <span class="breadcrumb-community">{{ communityName }}</span>
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M4.5 3L7.5 6L4.5 9" stroke="#9AA4B2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span class="breadcrumb-project">{{ projectName }}</span>
+        </div>
+      </div>
+      
+      <div class="quick-view-content" *ngIf="quickViewCamera">
+        <div class="quick-view-camera-header">
+          <div class="camera-header-left">
+            <div class="camera-name-section">
+              <h2 class="camera-name">
+                {{ quickViewCamera.name }}
+                <span class="status-dot active">•</span>
+              </h2>
+              <div class="status-badge" [class.status-active]="quickViewCamera.status === 'Active'" 
+                   [class.status-error]="quickViewCamera.status === 'Error'"
+                   [class.status-maintenance]="quickViewCamera.status === 'Maintenance'">
+                {{ quickViewCamera.status }}
+              </div>
+            </div>
+            <div class="camera-dates">
+              <div class="date-item">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="2" y="3" width="12" height="11" rx="2" stroke="#4B5565" stroke-width="1.5" fill="none"/>
+                  <path d="M5 1V4M11 1V4M2 7H14" stroke="#4B5565" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+                <span>{{ quickViewCamera.lastPhotoDate }}</span>
+              </div>
+              <div class="date-item">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="8" cy="8" r="6" stroke="#4B5565" stroke-width="1.5" fill="none"/>
+                  <path d="M8 4V8L10 10" stroke="#4B5565" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+                <span>{{ quickViewCamera.lastPhotoTime || '14:52:37' }}</span>
+              </div>
+            </div>
+          </div>
+          <button class="view-details-btn" [routerLink]="['/camera', quickViewCamera.id]">View Details</button>
+        </div>
+        
+        <div class="quick-view-image-section">
+          <div class="main-image-container">
+            <img [src]="quickViewCamera.image" [alt]="quickViewCamera.name" class="main-image" />
+            <div class="thumbnail-overlay" *ngIf="quickViewCamera.thumbnail">
+              <img [src]="quickViewCamera.thumbnail" [alt]="quickViewCamera.name" class="thumbnail-image" />
+            </div>
+          </div>
+          <div class="navigation-arrows">
+            <button class="nav-arrow nav-arrow-left" (click)="navigatePreviousCamera()" [disabled]="currentCameraIndex === 0">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M10 3L5 8L10 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <button class="nav-arrow nav-arrow-right" (click)="navigateNextCamera()" [disabled]="currentCameraIndex === cameras.length - 1">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M6 3L11 8L6 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
