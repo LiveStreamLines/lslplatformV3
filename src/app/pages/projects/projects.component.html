@@ -10,14 +10,12 @@
         [class.active]="viewMode === 'list'"
         (click)="toggleView('list')"
         class="view-btn">
-        <span class="view-icon">📋</span>
         <span class="view-label">List</span>
       </button>
       <button 
         [class.active]="viewMode === 'map'"
         (click)="toggleView('map')"
         class="view-btn">
-        <span class="view-icon">🗺️</span>
         <span class="view-label">Map</span>
       </button>
     </div>
@@ -35,22 +33,21 @@
       <div class="card-image-container">
         <img [src]="project.image" [alt]="project.name" class="project-image" />
         <span class="status-badge">{{ project.status }}</span>
-      </div>
-
-      <div class="card-progress">
-        <div class="progress-info">
-          <span class="progress-text">{{ project.daysCompleted }} Days Completed</span>
-        </div>
-        <div class="progress-bar-container">
-          <div class="progress-bar">
-            <div 
-              class="progress-fill"
-              [style.width.%]="getProgressPercentage(project.daysCompleted, project.totalDays)">
-            </div>
+        <div class="card-progress">
+          <div class="progress-info">
+            <span class="progress-text">{{ project.daysCompleted }} Days Completed</span>
           </div>
-          <div class="progress-labels">
-            <span>0</span>
-            <span>{{ project.totalDays }}</span>
+          <div class="progress-bar-container">
+            <div class="progress-bar">
+              <div 
+                class="progress-fill"
+                [style.width.%]="getProgressPercentage(project.daysCompleted, project.totalDays)">
+              </div>
+            </div>
+            <div class="progress-labels">
+              <span>0</span>
+              <span>{{ project.totalDays }}</span>
+            </div>
           </div>
         </div>
       </div>

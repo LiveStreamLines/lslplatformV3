@@ -1,0 +1,41 @@
+<div class="color-picker-widget" [class.expanded]="isExpanded">
+  <button class="toggle-btn" (click)="toggleExpanded()" [style.background-color]="primaryColor">
+    <span class="icon">🎨</span>
+  </button>
+  
+  <div class="picker-content" *ngIf="isExpanded">
+    <div class="picker-header">
+      <h3>Primary Color</h3>
+      <button class="close-btn" (click)="toggleExpanded()">×</button>
+    </div>
+    <div class="picker-body">
+      <div class="color-input-wrapper">
+        <label for="color-picker">Choose Color:</label>
+        <div class="color-input-container">
+          <input
+            type="color"
+            id="color-picker"
+            [value]="primaryColor"
+            (input)="onColorChange($event)"
+            class="color-input"
+          />
+          <input
+            type="text"
+            [value]="primaryColor"
+            (blur)="onColorChange($event)"
+            (keyup.enter)="onColorChange($event)"
+            class="color-text"
+            placeholder="#5621d2"
+          />
+        </div>
+      </div>
+      <div class="color-preview">
+        <div class="preview-item">
+          <span class="preview-label">Primary</span>
+          <div class="preview-box" [style.background-color]="primaryColor"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+

@@ -3,15 +3,13 @@
   [class.open]="isOpen"
   (click)="onBackdropClick($event)">
   <div class="overlay-panel" [class.open]="isOpen">
-    <div class="overlay-header">
+    <div class="overlay-content-wrapper">
       <button class="close-btn" (click)="onClose()">
-        <span>✕</span>
-        <span>Close</span>
+        <span class="close-icon">✕</span>
+        <span class="close-text">Close</span>
       </button>
-    </div>
-    
-    <div class="overlay-content">
-      <div class="main-content">
+      
+      <div class="overlay-content">
         <app-projects [selectedCategory]="selectedCategory"></app-projects>
       </div>
     </div>

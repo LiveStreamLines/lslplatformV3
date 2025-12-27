@@ -4,7 +4,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.3);
   z-index: 1000;
   opacity: 0;
   visibility: hidden;
@@ -20,62 +20,258 @@
   position: fixed;
   top: 0;
   right: 0;
-  width: 75%;
+  width: 909px;
   height: 100%;
-  background: #f8f8f8;
-  transform: translateX(100%);
-  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 1001;
+  pointer-events: none;
   display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15);
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 0;
 }
 
 .overlay-panel.open {
-  transform: translateX(0);
+  pointer-events: auto;
 }
 
-.overlay-header {
-  padding: 1rem 2rem;
-  background: #ffffff;
-  border-bottom: 1px solid #e5e5e5;
+.overlay-content-wrapper {
+  position: relative;
+  width: 909px;
+  height: 720px;
+  max-height: 100vh;
+  background: linear-gradient(225deg, var(--gradient-start) 0%, var(--gradient-end) 25%);
+  padding: 30px;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  gap: 8px;
+  transform: translateX(100%);
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+}
+
+.overlay-panel.open .overlay-content-wrapper {
+  transform: translateX(0);
 }
 
 .close-btn {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  background: none;
+  gap: 4px;
+  background: #ffffff;
   border: none;
   cursor: pointer;
-  color: #2d2d2d;
-  font-size: 1rem;
-  padding: 0.5rem;
-  transition: color 0.3s ease;
+  color: #121926;
+  font-size: 14px;
+  font-weight: 400;
+  padding: 0 16px;
+  height: 32px;
+  border-radius: 999px;
+  transition: all 0.3s ease;
+  font-family: 'Inter', sans-serif;
+  line-height: 1.5;
+  align-self: flex-start;
 }
 
 .close-btn:hover {
-  color: #6b46c1;
+  background: #f5f5f5;
 }
 
-.close-btn span:first-child {
-  font-size: 1.25rem;
-  font-weight: 300;
+.close-icon {
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+}
+
+.close-text {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
 }
 
 .overlay-content {
-  display: flex;
-  flex: 1;
-  overflow: hidden;
-}
-
-.main-content {
   flex: 1;
   width: 100%;
   overflow-y: auto;
-  background: #f8f8f8;
+  overflow-x: hidden;
+  background: transparent;
+  min-height: 0;
+}
+
+/* Override projects grid to show 3 cards per row */
+.overlay-content ::ng-deep .projects-grid {
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+/* Ensure proper spacing for 3 columns */
+.overlay-content ::ng-deep .projects-page {
+  padding: 0;
+  background: transparent;
+  min-height: auto;
+}
+
+/* Update page header styling */
+.overlay-content ::ng-deep .page-header {
+  margin-bottom: 17px;
+  align-items: flex-end;
+}
+
+/* Update breadcrumb styling */
+.overlay-content ::ng-deep .breadcrumb {
+  font-size: 20px;
+  line-height: 1.3;
+  gap: 8px;
+}
+
+.overlay-content ::ng-deep .breadcrumb-item {
+  color: #202939;
+  font-weight: 400;
+}
+
+.overlay-content ::ng-deep .breadcrumb-item.active {
+  color: var(--primary-color);
+  font-weight: 600;
+}
+
+.overlay-content ::ng-deep .breadcrumb-separator {
+  color: #9aa4b2;
+  font-weight: 400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1px;
+  height: 20px;
+  background: #9aa4b2;
+  border: none;
+  padding: 0;
+}
+
+/* Update view toggle styling */
+.overlay-content ::ng-deep .view-toggle {
+  gap: 0;
+  border: 1px solid #9aa4b2;
+  border-radius: 999px;
+  overflow: hidden;
+  display: flex;
+}
+
+.overlay-content ::ng-deep .view-btn {
+  border-radius: 0;
+  border: none;
+  border-right: 1px solid #9aa4b2;
+  margin: 0;
+  padding: 4px 16px;
+  height: 32px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.overlay-content ::ng-deep .view-btn:last-child {
+  border-right: none;
+}
+
+.overlay-content ::ng-deep .view-btn.active {
+  background: var(--primary-color);
+  color: #ffffff;
+  border-color: var(--primary-color);
+}
+
+.overlay-content ::ng-deep .view-btn:not(.active) {
+  background: #ffffff;
+  color: #4b5565;
+  border-color: #9aa4b2;
+}
+
+/* Update project card styling */
+.overlay-content ::ng-deep .project-card {
+  border: 2px solid #ffffff;
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.overlay-content ::ng-deep .card-header {
+  padding: 0;
+  order: 1;
+}
+
+.overlay-content ::ng-deep .project-name {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: #121926;
+  margin: 0;
+}
+
+.overlay-content ::ng-deep .card-image-container {
+  order: 2;
+  height: 160px;
+  border-radius: 8px;
+}
+
+.overlay-content ::ng-deep .card-actions {
+  order: 3;
+  padding: 0;
+  border-top: none;
+  justify-content: space-between;
+  gap: 0;
+}
+
+.overlay-content ::ng-deep .action-btn {
+  width: 20px;
+  height: 20px;
+  background: transparent;
+  border-radius: 0;
+}
+
+.overlay-content ::ng-deep .action-icon-img {
+  width: 20px;
+  height: 20px;
+}
+
+/* Update active indicator tooltip */
+.overlay-content ::ng-deep .active-indicator {
+  background: var(--primary-color-dark);
+  padding: 8px;
+  border-radius: 10px;
+  gap: 14px;
+  margin-bottom: 3px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.overlay-content ::ng-deep .active-indicator::after {
+  border-top-color: var(--primary-color-dark);
+  border-width: 13px 7px 0 7px;
+}
+
+.overlay-content ::ng-deep .indicator-text {
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.overlay-content ::ng-deep .active-badge {
+  background: #00b330;
+  color: var(--primary-color-bg);
+  padding: 0 10px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 60px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.55px;
+  text-transform: uppercase;
 }
 

@@ -58,7 +58,7 @@ export const NAV_ICONS = {
     filled: 'assets/images/icons/nav-svg/settings-filled.svg',
     outline: 'assets/images/icons/nav-svg/settings-outline.svg'
   },
-  search: 'assets/images/icons/nav/search.png' // Keep PNG for search if no SVG available
+  search: 'assets/images/icons/nav/search.svg'
 };
 
 // User Avatar

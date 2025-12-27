@@ -96,7 +96,7 @@
 }
 
 .nav-item.active {
-  background: #5621d2;
+  background: var(--primary-color);
   color: #ffffff;
 }
 
@@ -121,8 +121,8 @@
 }
 
 .search-btn {
-  background: #f6f2ff;
-  border: 1.5px solid #ede5ff;
+  background: var(--primary-color-bg);
+  border: 1.5px solid var(--primary-color-border);
   border-radius: 999px;
   width: 32px;
   height: 32px;
@@ -152,7 +152,7 @@
   padding: 8px;
   border-radius: 8px;
   background: #ffffff;
-  border: 1px solid #ede5ff;
+  border: 1px solid var(--primary-color-border);
   transition: background 0.3s ease;
 }
 
@@ -193,9 +193,10 @@
 }
 
 .chevron-icon {
-  width: 16px;
-  height: 16px;
+  width: 10px;
+  height: 6px;
   object-fit: contain;
   flex-shrink: 0;
+  transform: rotate(180deg);
 }
 

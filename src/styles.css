@@ -1,3 +1,17 @@
+/* CSS Variables */
+:root {
+  --primary-color: #5621d2;
+  --primary-color-dark: #110038;
+  --primary-color-light: #6b46c1;
+  --primary-color-bg: #f6f2ff;
+  --primary-color-border: #ede5ff;
+  --primary-color-hover: #e9d5ff;
+  --gradient-start: #a68de5;
+  --gradient-end: #f6f2ff;
+  --gradient-card-start: #e0d9ef;
+  --gradient-overlay: rgba(10, 0, 35, 0.7);
+}
+
 /* Global Styles */
 * {
   margin: 0;
