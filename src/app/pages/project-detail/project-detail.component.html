@@ -105,7 +105,22 @@
         </div>
       </div>
 
-      <div class="cameras-grid" *ngIf="viewMode === 'list'">
+      <!-- Loading State -->
+      <div *ngIf="isLoadingCameras && viewMode === 'list'" class="loading-state">
+        <p>Loading cameras...</p>
+      </div>
+
+      <!-- Error State -->
+      <div *ngIf="error && !isLoadingCameras && viewMode === 'list'" class="error-state">
+        <p>{{ error }}</p>
+      </div>
+
+      <!-- Empty State -->
+      <div *ngIf="!isLoadingCameras && !error && cameras.length === 0 && viewMode === 'list'" class="empty-state">
+        <p>No cameras found for this project.</p>
+      </div>
+
+      <div class="cameras-grid" *ngIf="!isLoadingCameras && !error && viewMode === 'list'">
         <div 
           *ngFor="let camera of cameras"
           class="camera-card"

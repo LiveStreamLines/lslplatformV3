@@ -21,7 +21,22 @@
     </div>
   </div>
 
-  <div class="projects-grid" *ngIf="viewMode === 'list'">
+  <!-- Loading State -->
+  <div *ngIf="isLoading && viewMode === 'list'" class="loading-state">
+    <p>Loading projects...</p>
+  </div>
+
+  <!-- Error State -->
+  <div *ngIf="error && !isLoading && viewMode === 'list'" class="error-state">
+    <p>{{ error }}</p>
+  </div>
+
+  <!-- Empty State -->
+  <div *ngIf="!isLoading && !error && projects.length === 0 && viewMode === 'list'" class="empty-state">
+    <p>No projects found for this developer.</p>
+  </div>
+
+  <div class="projects-grid" *ngIf="!isLoading && !error && viewMode === 'list'">
     <div 
       *ngFor="let project of projects" 
       class="project-card"

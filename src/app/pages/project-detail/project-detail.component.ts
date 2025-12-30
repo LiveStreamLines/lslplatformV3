@@ -1,18 +1,12 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { RouterModule, ActivatedRoute } from '@angular/router';
 import { PROJECT_IMAGE } from '../../constants/figma-assets';
-
-interface Camera {
-  id: number;
-  name: string;
-  image: string;
-  thumbnail?: string;
-  status: 'Active' | 'Error' | 'Maintenance';
-  installedDate: string;
-  lastPhotoDate: string;
-  lastPhotoTime?: string;
-}
+import { ProjectsService } from '../../services/projects.service';
+import { CamerasService } from '../../services/cameras.service';
+import { Camera } from '../../models/camera.model';
+import { Project } from '../../models/project.model';
+import { CommunitiesService } from '../../services/communities.service';
 
 @Component({
   selector: 'app-project-detail',
@@ -22,86 +16,43 @@ interface Camera {
   styleUrl: './project-detail.component.css'
 })
 export class ProjectDetailComponent implements OnInit {
-  projectName = 'GOLF GRAND';
-  communityName = 'Dubai Hills Estate';
-  daysCompleted = 696;
-  totalDays = 1500;
-  progressPercentage = 55;
+  projectId: string = '';
+  project: Project | null = null;
+  projectName = 'Loading...';
+  communityName = 'Loading...';
+  daysCompleted = 0;
+  totalDays = 0;
+  progressPercentage = 0;
   bannerImage = PROJECT_IMAGE;
   
   activeTab: 'timelaps' | 'live' | 'satellite' | 'gallery' = 'timelaps';
   viewMode: 'list' | 'map' | 'slideshow' = 'list';
   
-  cameras: Camera[] = [
-    {
-      id: 1,
-      name: 'Camera 1',
-      image: PROJECT_IMAGE,
-      thumbnail: PROJECT_IMAGE,
-      status: 'Active',
-      installedDate: '08/07/2024',
-      lastPhotoDate: '20-Dec-2025',
-      lastPhotoTime: '14:52:37'
-    },
-    {
-      id: 2,
-      name: 'Camera 1',
-      image: PROJECT_IMAGE,
-      thumbnail: PROJECT_IMAGE,
-      status: 'Active',
-      installedDate: '08/07/2024',
-      lastPhotoDate: '20-Dec-2025',
-      lastPhotoTime: '14:52:37'
-    },
-    {
-      id: 3,
-      name: 'Camera 1',
-      image: PROJECT_IMAGE,
-      thumbnail: PROJECT_IMAGE,
-      status: 'Active',
-      installedDate: '08/07/2024',
-      lastPhotoDate: '20-Dec-2025',
-      lastPhotoTime: '14:52:37'
-    },
-    {
-      id: 4,
-      name: 'Camera 1',
-      image: PROJECT_IMAGE,
-      thumbnail: PROJECT_IMAGE,
-      status: 'Error',
-      installedDate: '08/07/2024',
-      lastPhotoDate: '20-Dec-2025',
-      lastPhotoTime: '14:52:37'
-    },
-    {
-      id: 5,
-      name: 'Camera 1',
-      image: PROJECT_IMAGE,
-      thumbnail: PROJECT_IMAGE,
-      status: 'Active',
-      installedDate: '08/07/2024',
-      lastPhotoDate: '20-Dec-2025',
-      lastPhotoTime: '14:52:37'
-    },
-    {
-      id: 6,
-      name: 'Camera 1',
-      image: PROJECT_IMAGE,
-      thumbnail: PROJECT_IMAGE,
-      status: 'Maintenance',
-      installedDate: '08/07/2024',
-      lastPhotoDate: '20-Dec-2025',
-      lastPhotoTime: '14:52:37'
-    }
-  ];
+  cameras: Camera[] = [];
+  isLoading = false;
+  isLoadingCameras = false;
+  error: string | null = null;
 
-  hoveredCameraId: number | null = null;
+  hoveredCameraId: string | null = null;
   quickViewCamera: Camera | null = null;
   isQuickViewOpen = false;
   currentCameraIndex: number = 0;
 
+  constructor(
+    private route: ActivatedRoute,
+    private projectsService: ProjectsService,
+    private camerasService: CamerasService,
+    private communitiesService: CommunitiesService
+  ) {}
+
   ngOnInit() {
-    this.progressPercentage = Math.round((this.daysCompleted / this.totalDays) * 100);
+    this.route.params.subscribe(params => {
+      this.projectId = params['id'];
+      if (this.projectId) {
+        this.loadProject();
+        this.loadCameras();
+      }
+    });
   }
 
   setActiveTab(tab: 'timelaps' | 'live' | 'satellite' | 'gallery') {
@@ -112,7 +63,66 @@ export class ProjectDetailComponent implements OnInit {
     this.viewMode = mode;
   }
 
-  onCameraHover(cameraId: number) {
+  loadProject() {
+    if (!this.projectId) return;
+
+    this.isLoading = true;
+    this.error = null;
+
+    this.projectsService.getProjectById(this.projectId).subscribe({
+      next: (project) => {
+        this.project = project;
+        this.projectName = project.name;
+        this.bannerImage = project.image || PROJECT_IMAGE;
+        this.daysCompleted = project.daysCompleted || 0;
+        this.totalDays = project.totalDays || 0;
+        this.progressPercentage = this.totalDays > 0 
+          ? Math.round((this.daysCompleted / this.totalDays) * 100) 
+          : 0;
+
+        // Load community/developer name
+        if (project.developer) {
+          this.communitiesService.getCommunityById(project.developer).subscribe({
+            next: (community) => {
+              this.communityName = community.name;
+            },
+            error: () => {
+              this.communityName = 'Unknown';
+            }
+          });
+        }
+
+        this.isLoading = false;
+      },
+      error: (err) => {
+        console.error('Error loading project:', err);
+        this.error = 'Failed to load project details.';
+        this.isLoading = false;
+      }
+    });
+  }
+
+  loadCameras() {
+    if (!this.projectId) return;
+
+    this.isLoadingCameras = true;
+    this.error = null;
+
+    this.camerasService.getCamerasByProjectId(this.projectId).subscribe({
+      next: (cameras) => {
+        this.cameras = cameras;
+        this.isLoadingCameras = false;
+      },
+      error: (err) => {
+        console.error('Error loading cameras:', err);
+        this.error = 'Failed to load cameras.';
+        this.isLoadingCameras = false;
+        this.cameras = [];
+      }
+    });
+  }
+
+  onCameraHover(cameraId: string) {
     this.hoveredCameraId = cameraId;
   }
 
@@ -156,6 +166,7 @@ export class ProjectDetailComponent implements OnInit {
 
   getProgressWidth(): number {
     // Progress bar is 220px wide, so calculate pixel width
+    if (this.totalDays === 0) return 0;
     const progressPercentage = (this.daysCompleted / this.totalDays);
     return progressPercentage * 220;
   }

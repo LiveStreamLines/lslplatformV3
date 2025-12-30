@@ -10,7 +10,10 @@
       </button>
       
       <div class="overlay-content">
-        <app-projects [selectedCategory]="selectedCategory"></app-projects>
+        <app-projects 
+          [selectedCategory]="selectedCategory"
+          [developerId]="community?.id || ''">
+        </app-projects>
       </div>
     </div>
   </div>

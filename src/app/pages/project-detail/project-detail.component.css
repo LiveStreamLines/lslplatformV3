@@ -7,6 +7,30 @@
   background: transparent;
 }
 
+/* Loading, Error, and Empty States */
+.loading-state,
+.error-state,
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+}
+
+.loading-state p,
+.error-state p,
+.empty-state p {
+  font-size: 16px;
+  color: var(--primary-color);
+  margin: 0;
+}
+
+.error-state p {
+  color: #dc3545;
+}
+
 /* Breadcrumb Section */
 .breadcrumb-section {
   display: flex;
