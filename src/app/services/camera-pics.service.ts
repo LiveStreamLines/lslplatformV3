@@ -67,20 +67,32 @@ export class CameraPicsService {
   }
 
   /**
+   * Get proxied image URL (uses backend proxy to avoid CORS issues)
+   * @param developerTag - Developer tag (not ID)
+   * @param projectTag - Project tag (not ID)
+   * @param cameraTag - Camera tag (camera name, not ID)
+   * @param imageTimestamp - Image timestamp (YYYYMMDDHHMMSS format, e.g., "20251230021102")
+   */
+  getProxiedImageUrl(developerTag: string, projectTag: string, cameraTag: string, imageTimestamp: string): string {
+    // Return the proxy endpoint URL directly - the backend will handle fetching from S3 with CORS headers
+    return `${getApiUrl('/api/camerapics-s3-test')}/proxy/${developerTag}/${projectTag}/${cameraTag}/${imageTimestamp}`;
+  }
+
+  /**
    * Get the last image URL for a camera
-   * Uses the getImagePresignedUrl endpoint to get presigned URLs from S3
+   * Uses the proxy endpoint to avoid CORS issues
    * @param developerTag - Developer tag (not ID)
    * @param projectTag - Project tag (not ID)
    * @param cameraTag - Camera tag (camera name, not ID)
    */
   getLastImageUrl(developerTag: string, projectTag: string, cameraTag: string): Observable<string> {
     return this.getCameraPictures(developerTag, projectTag, cameraTag).pipe(
-      switchMap(response => {
-        // If we have the last photo filename, use getImagePresignedUrl endpoint
+      map(response => {
+        // If we have the last photo filename, use proxy endpoint to avoid CORS
         if (response.lastPhoto) {
-          return this.getImagePresignedUrl(developerTag, projectTag, cameraTag, response.lastPhoto);
+          return this.getProxiedImageUrl(developerTag, projectTag, cameraTag, response.lastPhoto);
         }
-        return of('');
+        return '';
       })
     );
   }
@@ -103,27 +115,17 @@ export class CameraPicsService {
     
     // POST request with today's date for both date1 and date2
     return this.http.post<CameraPicturesResponse>(url, { date1: todayStr, date2: todayStr }).pipe(
-      switchMap(response => {
+      map(response => {
         // Combine date1Photos and date2Photos (they should be the same for today)
         const allTodayPhotos = [...new Set([...response.date1Photos, ...response.date2Photos])];
         
         if (allTodayPhotos.length === 0) {
-          return of([]);
+          return [];
         }
 
-        // Get presigned URLs for all today's images
-        const imageUrlRequests = allTodayPhotos.map(timestamp => 
-          this.getImagePresignedUrl(developerTag, projectTag, cameraTag, timestamp).pipe(
-            catchError(error => {
-              console.warn(`Failed to get presigned URL for ${timestamp}:`, error);
-              return of('');
-            })
-          )
-        );
-
-        // Use forkJoin to get all URLs in parallel
-        return forkJoin(imageUrlRequests).pipe(
-          map(urls => urls.filter(url => url !== '')) // Filter out empty URLs
+        // Use proxy URLs to avoid CORS issues
+        return allTodayPhotos.map(timestamp => 
+          this.getProxiedImageUrl(developerTag, projectTag, cameraTag, timestamp)
         );
       }),
       catchError(error => {
