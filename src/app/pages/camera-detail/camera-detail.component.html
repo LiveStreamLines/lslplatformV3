@@ -74,7 +74,18 @@
 
       <!-- Center - Image Carousel -->
       <div class="image-carousel-container">
-        <div class="carousel-images">
+        <!-- Loading State -->
+        <div *ngIf="isLoading" class="loading-state">
+          <p>Loading today's images...</p>
+        </div>
+        
+        <!-- Empty State -->
+        <div *ngIf="!isLoading && images.length === 0" class="empty-state">
+          <p>No images available for today</p>
+        </div>
+        
+        <!-- Images Carousel -->
+        <div *ngIf="!isLoading && images.length > 0" class="carousel-images">
           <div *ngFor="let image of images; let i = index" 
                class="carousel-image" 
                [class.active]="i === currentImageIndex"

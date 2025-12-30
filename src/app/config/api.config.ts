@@ -13,7 +13,8 @@ export const API_CONFIG = {
 
 /**
  * Authentication Token
- * TODO: Move this to a secure storage (e.g., environment variable or auth service)
+ * @deprecated Token is now managed by AuthService. Use AuthService.getToken() instead.
+ * This constant is kept for backward compatibility but should not be used directly.
  */
 export const AUTH_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImFtYXJAbGl2ZXN0cmVhbWxpbmVzLmNvbSIsInJvbGUiOiJTdXBlciBBZG1pbiIsImlhdCI6MTc2Njk5MDU5MSwiZXhwIjoxNzY3MDc2OTkxfQ.1Fbn3_OnbvC3SbtHsjtCQB5sVESWty2pW810CD-7OA0';
 

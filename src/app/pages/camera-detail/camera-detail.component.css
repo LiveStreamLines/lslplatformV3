@@ -210,6 +210,19 @@
   overflow: hidden;
 }
 
+/* Loading and Empty States */
+.image-carousel-container .loading-state,
+.image-carousel-container .empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+  color: #697586;
+  font-size: 16px;
+  font-weight: 400;
+}
+
 .carousel-images {
   position: relative;
   width: 100%;

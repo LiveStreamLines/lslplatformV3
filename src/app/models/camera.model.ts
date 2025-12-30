@@ -5,10 +5,12 @@
 export interface Camera {
   id: string;
   name: string;
-  camera: string;
+  camera: string; // Camera tag
   cameraDescription?: string;
-  project: string;
-  developer: string;
+  project: string; // Project ID
+  developer: string; // Developer ID
+  projectTag?: string; // Project tag (for S3 paths)
+  developerTag?: string; // Developer tag (for S3 paths)
   image?: string;
   thumbnail?: string;
   status: 'Active' | 'Error' | 'Maintenance';
