@@ -7,7 +7,7 @@ import { AuthService } from '../services/auth.service';
  */
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   // Only add token to requests going to our backend
-  if (req.url.includes('lsl-platform.com/backend')) {
+  if (req.url.includes('lsl-platform.com/backend') || req.url.includes('/api/')) {
     const authService = inject(AuthService);
     const token = authService.getToken();
     

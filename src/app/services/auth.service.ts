@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, BehaviorSubject, of } from 'rxjs';
 import { map, catchError, tap } from 'rxjs/operators';
-import { API_CONFIG, getApiUrl } from '../config/api.config';
+import { getApiUrl } from '../config/api.config';
 
 export interface LoginResponse {
   _id: string;
@@ -33,7 +33,7 @@ export class AuthService {
    * Login with email and password
    */
   login(email: string, password: string): Observable<LoginResponse> {
-    const loginUrl = `${API_CONFIG.baseUrl}/api/auth/login`;
+    const loginUrl = getApiUrl('/api/auth/login');
     
     return this.http.post<LoginResponse>(loginUrl, { email, password }).pipe(
       tap(response => {
@@ -104,9 +104,40 @@ export class AuthService {
 
   /**
    * Check if user is authenticated
+   * Validates that token exists and is not expired
    */
   isAuthenticated(): boolean {
-    return !!this.getToken();
+    const token = this.getToken();
+    if (!token) {
+      return false;
+    }
+    
+    // Basic token validation - check if it's a valid JWT format
+    try {
+      const parts = token.split('.');
+      if (parts.length !== 3) {
+        // Invalid token format, clear it
+        this.logout();
+        return false;
+      }
+      
+      // Decode payload to check expiration (basic check)
+      const payload = JSON.parse(atob(parts[1]));
+      const now = Math.floor(Date.now() / 1000);
+      
+      if (payload.exp && payload.exp < now) {
+        // Token expired, clear it
+        this.logout();
+        return false;
+      }
+      
+      return true;
+    } catch (error) {
+      // Invalid token, clear it
+      console.warn('Token validation error:', error);
+      this.logout();
+      return false;
+    }
   }
 
   /**
