@@ -138,7 +138,7 @@
     <!-- Bottom Controls -->
     <div class="bottom-controls">
       <div class="date-time-controls">
-        <div class="date-picker">
+        <div class="date-picker" (click)="toggleDatePicker()">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect x="2" y="3" width="12" height="11" rx="2" stroke="currentColor" stroke-width="1.5"/>
             <path d="M5 1V4M11 1V4M2 7H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
@@ -147,6 +147,13 @@
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M4 6L8 10L12 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
+          <input 
+            type="date" 
+            [value]="getDateInputValue()" 
+            (change)="onDateChange($event)"
+            class="date-input"
+            [style.display]="showDatePicker ? 'block' : 'none'"
+          />
         </div>
         <div class="time-picker">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">

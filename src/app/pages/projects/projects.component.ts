@@ -40,6 +40,11 @@ export class ProjectsComponent implements OnInit, OnChanges {
     this.router.navigate(['/project', projectId]);
   }
 
+  navigateToAllProjects() {
+    // Navigate to communities page to show all projects
+    this.router.navigate(['/communities']);
+  }
+
   ngOnInit() {
     if (this.developerId) {
       this.loadProjects();

@@ -49,6 +49,16 @@
   font-weight: 400;
 }
 
+.breadcrumb-item.clickable {
+  cursor: pointer;
+  transition: color 0.3s ease;
+}
+
+.breadcrumb-item.clickable:hover {
+  color: var(--primary-color);
+  text-decoration: underline;
+}
+
 .breadcrumb-separator {
   color: #9aa4b2;
   font-weight: 400;

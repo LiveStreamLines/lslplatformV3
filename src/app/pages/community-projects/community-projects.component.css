@@ -37,8 +37,7 @@
 .overlay-content-wrapper {
   position: relative;
   width: 909px;
-  height: 720px;
-  max-height: 100vh;
+  height: 100%;
   background: linear-gradient(225deg, var(--gradient-start) 0%, var(--gradient-end) 25%);
   padding: 30px;
   display: flex;
@@ -118,6 +117,7 @@
 
 /* Update page header styling */
 .overlay-content ::ng-deep .page-header {
+  margin-top: 24px;
   margin-bottom: 17px;
   align-items: flex-end;
 }

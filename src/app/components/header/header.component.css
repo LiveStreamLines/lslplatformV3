@@ -8,8 +8,6 @@
   top: 0;
   z-index: 100;
   width: 100%;
-  max-width: 1280px;
-  margin: 0 auto;
   box-sizing: border-box;
 }
 
@@ -25,44 +23,9 @@
   gap: 16px;
 }
 
-.emaar-logo-img {
-  width: 157px;
-  height: 45px;
-  object-fit: contain;
-}
-
-.divider-line {
-  width: 1px;
-  height: 45px;
-  background: #cdd5df;
-  flex-shrink: 0;
-}
-
-.powered-by-section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: flex-start;
-  justify-content: center;
-}
-
-.powered-by-text {
-  font-size: 6px;
-  font-weight: 400;
-  font-family: 'Inter', sans-serif;
-  color: #868686;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  line-height: 1.2;
-  white-space: nowrap;
-  height: 6px;
-  display: flex;
-  align-items: center;
-}
-
 .lsl-logo-img {
-  height: 26.017px;
-  width: 43.162px;
+  height: 45px;
+  width: auto;
   object-fit: contain;
 }
 
@@ -78,7 +41,7 @@
   align-items: center;
   gap: 6px;
   padding: 0 12px;
-  height: 32px;
+  height: 40px;
   border-radius: 999px;
   text-decoration: none;
   font-size: 13px;
@@ -96,7 +59,7 @@
 }
 
 .nav-item.active {
-  background: var(--primary-color);
+  background: #5621d2;
   color: #ffffff;
 }
 
@@ -121,8 +84,8 @@
 }
 
 .search-btn {
-  background: var(--primary-color-bg);
-  border: 1.5px solid var(--primary-color-border);
+  background: #f6f2ff;
+  border: 1.5px solid #ede5ff;
   border-radius: 999px;
   width: 32px;
   height: 32px;
