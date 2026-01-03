@@ -117,7 +117,6 @@
 
 /* Update page header styling */
 .overlay-content ::ng-deep .page-header {
-  margin-top: 24px;
   margin-bottom: 17px;
   align-items: flex-end;
 }

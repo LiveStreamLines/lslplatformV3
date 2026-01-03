@@ -1,9 +1,10 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, forkJoin } from 'rxjs';
-import { map, catchError, switchMap } from 'rxjs/operators';
+import { map, catchError, switchMap, tap } from 'rxjs/operators';
 import { of } from 'rxjs';
 import { API_CONFIG, getApiUrl } from '../config/api.config';
+import { CameraPicsCacheService } from './camera-pics-cache.service';
 
 export interface CameraPicturesResponse {
   firstPhoto: string;
@@ -19,7 +20,10 @@ export interface CameraPicturesResponse {
   providedIn: 'root'
 })
 export class CameraPicsService {
-  constructor(private http: HttpClient) {}
+  constructor(
+    private http: HttpClient,
+    private cacheService: CameraPicsCacheService
+  ) {}
 
   /**
    * Get camera pictures from S3
@@ -81,12 +85,27 @@ export class CameraPicsService {
   /**
    * Get the last image URL for a camera
    * Uses the proxy endpoint to avoid CORS issues
+   * Checks cache first to avoid unnecessary API calls
    * @param developerTag - Developer tag (not ID)
    * @param projectTag - Project tag (not ID)
    * @param cameraTag - Camera tag (camera name, not ID)
    */
   getLastImageUrl(developerTag: string, projectTag: string, cameraTag: string): Observable<string> {
+    // Check cache first
+    const cachedTimestamp = this.cacheService.getLastPhoto(developerTag, projectTag, cameraTag);
+    if (cachedTimestamp) {
+      // Return cached image URL immediately
+      return of(this.getProxiedImageUrl(developerTag, projectTag, cameraTag, cachedTimestamp));
+    }
+
+    // Cache miss - fetch from API
     return this.getCameraPictures(developerTag, projectTag, cameraTag).pipe(
+      tap(response => {
+        // Cache the last photo timestamp
+        if (response.lastPhoto) {
+          this.cacheService.setLastPhoto(developerTag, projectTag, cameraTag, response.lastPhoto);
+        }
+      }),
       map(response => {
         // If we have the last photo filename, use proxy endpoint to avoid CORS
         if (response.lastPhoto) {

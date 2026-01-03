@@ -7,11 +7,11 @@
       </svg>
     </button>
     <div class="breadcrumb">
-      <span class="breadcrumb-item">emaar</span>
+      <span class="breadcrumb-item clickable" (click)="navigateToCommunities()">Clients</span>
       <svg class="breadcrumb-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M4.5 3L7.5 6L4.5 9" stroke="#9aa4b2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
-      <span class="breadcrumb-item">{{ communityName }}</span>
+      <span class="breadcrumb-item clickable" (click)="navigateToCommunity()">{{ communityName }}</span>
       <svg class="breadcrumb-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M4.5 3L7.5 6L4.5 9" stroke="#9aa4b2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
@@ -137,7 +137,17 @@
           </h3>
           
           <div class="camera-image-container">
-            <img [src]="camera.image" [alt]="camera.name" class="camera-image" />
+            <img 
+              [src]="camera.image || ''" 
+              [alt]="camera.name" 
+              class="camera-image"
+              (load)="onImageLoad($event, camera.id)"
+              (error)="onImageError($event, camera)"
+              [style.opacity]="camera.image && !loadingImages.has(camera.id) ? '1' : '0'"
+            />
+            <div *ngIf="loadingImages.has(camera.id) || !camera.image" class="image-loading-placeholder">
+              <div class="loading-spinner"></div>
+            </div>
             <div class="quick-view-overlay" *ngIf="hoveredCameraId === camera.id">
               <button class="quick-view-btn" (click)="openQuickView(camera, $event)">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -197,9 +207,10 @@
                 {{ quickViewCamera.name }}
                 <span class="status-dot active">•</span>
               </h2>
-              <div class="status-badge" [class.status-active]="quickViewCamera.status === 'Active'" 
-                   [class.status-error]="quickViewCamera.status === 'Error'"
-                   [class.status-maintenance]="quickViewCamera.status === 'Maintenance'">
+              <div class="status-badge" [class.status-online]="quickViewCamera.status === 'Online'" 
+                   [class.status-offline]="quickViewCamera.status === 'Offline'"
+                   [class.status-stopped]="quickViewCamera.status === 'Stopped'"
+                   [class.status-removed]="quickViewCamera.status === 'Removed'">
                 {{ quickViewCamera.status }}
               </div>
             </div>

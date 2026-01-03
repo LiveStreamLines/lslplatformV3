@@ -1,6 +1,7 @@
 // Local Asset Paths - Assets downloaded from Figma and stored locally
 // Project Images
 export const PROJECT_IMAGE = 'assets/images/projects/project-image.png';
+export const NO_IMAGE = 'assets/images/projects/noimage.png';
 
 // Community Images
 export const COMMUNITY_IMAGES = {

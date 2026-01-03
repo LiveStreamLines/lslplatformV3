@@ -6,9 +6,10 @@
         {{ cameraName }}
         <span class="status-dot">•</span>
       </h2>
-      <div class="status-badge" [class.status-active]="cameraStatus === 'Active'" 
-           [class.status-error]="cameraStatus === 'Error'"
-           [class.status-maintenance]="cameraStatus === 'Maintenance'">
+      <div class="status-badge" [class.status-online]="cameraStatus === 'Online'" 
+           [class.status-offline]="cameraStatus === 'Offline'"
+           [class.status-stopped]="cameraStatus === 'Stopped'"
+           [class.status-removed]="cameraStatus === 'Removed'">
         {{ cameraStatus }}
       </div>
     </div>
@@ -48,6 +49,47 @@
     </div>
   </div>
 
+  <!-- New Standalone Date Picker -->
+  <div class="new-date-picker-container">
+    <div class="new-date-picker-button" (click)="openDatePickerModal()">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="2" y="3" width="12" height="11" rx="2" stroke="currentColor" stroke-width="1.5"/>
+        <path d="M5 1V4M11 1V4M2 7H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      <span>{{ selectedDate }}</span>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M4 6L8 10L12 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Date Picker Modal -->
+  <div class="date-picker-modal" *ngIf="showDatePickerModal" (click)="closeDatePickerModal($event)">
+    <div class="date-picker-modal-content" (click)="$event.stopPropagation()">
+      <div class="date-picker-modal-header">
+        <h3>Select Date</h3>
+        <button class="modal-close-btn" (click)="closeDatePickerModal($event)">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M15 5L5 15M5 5L15 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+      <div class="date-picker-modal-body">
+        <input 
+          #dateInputModal
+          type="date" 
+          [value]="getDateInputValue()" 
+          (change)="onDateChange($event)"
+          class="date-input-modal"
+        />
+      </div>
+      <div class="date-picker-modal-footer">
+        <button class="modal-btn modal-btn-cancel" (click)="closeDatePickerModal($event)">Cancel</button>
+        <button class="modal-btn modal-btn-apply" (click)="applyDateFromModal()">Apply</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Main Content -->
   <div class="main-content">
     <div class="content-wrapper">
@@ -76,12 +118,12 @@
       <div class="image-carousel-container">
         <!-- Loading State -->
         <div *ngIf="isLoading" class="loading-state">
-          <p>Loading today's images...</p>
+          <p>Loading images...</p>
         </div>
         
         <!-- Empty State -->
         <div *ngIf="!isLoading && images.length === 0" class="empty-state">
-          <p>No images available for today</p>
+          <p>No images available</p>
         </div>
         
         <!-- Images Carousel -->
@@ -137,35 +179,6 @@
 
     <!-- Bottom Controls -->
     <div class="bottom-controls">
-      <div class="date-time-controls">
-        <div class="date-picker" (click)="toggleDatePicker()">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="2" y="3" width="12" height="11" rx="2" stroke="currentColor" stroke-width="1.5"/>
-            <path d="M5 1V4M11 1V4M2 7H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-          </svg>
-          <span>{{ selectedDate }}</span>
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M4 6L8 10L12 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          <input 
-            type="date" 
-            [value]="getDateInputValue()" 
-            (change)="onDateChange($event)"
-            class="date-input"
-            [style.display]="showDatePicker ? 'block' : 'none'"
-          />
-        </div>
-        <div class="time-picker">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/>
-            <path d="M8 4V8L10 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-          </svg>
-          <span>{{ selectedTime }}</span>
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M4 6L8 10L12 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </div>
-      </div>
       <button class="slider-btn">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
           <rect x="2" y="3" width="12" height="11" rx="2" stroke="currentColor" stroke-width="1.5"/>

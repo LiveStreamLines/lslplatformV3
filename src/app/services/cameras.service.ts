@@ -60,19 +60,13 @@ export class CamerasService {
       }
     }
 
-    // Determine status based on isActive and maintenanceStatus
-    let status: 'Active' | 'Error' | 'Maintenance' = 'Active';
-    if (!apiCamera.isActive || apiCamera.isActive === 'false') {
-      status = 'Error';
-    } else if (apiCamera.maintenanceStatus) {
-      if (apiCamera.maintenanceStatus.lowImages || apiCamera.maintenanceStatus.shutterExpiry) {
-        status = 'Maintenance';
-      }
-    }
+    // Initial status - will be updated based on last photo timestamp
+    // Default to 'Stopped' if no last photo date is available
+    let status: 'Online' | 'Offline' | 'Stopped' = 'Stopped';
 
-    // Format dates
+    // Format dates - use same format as last photo (DD-MMM-YYYY)
     const installedDate = apiCamera.createdDate 
-      ? this.formatDate(apiCamera.createdDate)
+      ? this.formatDateForDisplay(apiCamera.createdDate)
       : 'N/A';
 
     // For last photo date, we'll need to fetch this separately or use a default
