@@ -30,7 +30,8 @@ export class ProjectDetailComponent implements OnInit, AfterViewInit, OnDestroy 
   daysCompleted = 0;
   totalDays = 0;
   progressPercentage = 0;
-  bannerImage = PROJECT_IMAGE;
+  bannerImage: string | null = null;
+  isBannerImageLoading = false;
   
   activeTab: 'timelaps' | 'live' | 'satellite' | 'gallery' = 'timelaps';
   viewMode: 'list' | 'map' | 'slideshow' = 'list';
@@ -88,13 +89,14 @@ export class ProjectDetailComponent implements OnInit, AfterViewInit, OnDestroy 
     if (!this.projectId) return;
 
     this.isLoading = true;
+    this.isBannerImageLoading = false;
+    this.bannerImage = null; // Reset banner image when starting new load
     this.error = null;
 
     this.projectsService.getProjectById(this.projectId).subscribe({
       next: (project) => {
         this.project = project;
         this.projectName = project.name;
-        this.bannerImage = project.image || PROJECT_IMAGE;
         this.daysCompleted = project.daysCompleted || 0;
         this.totalDays = project.totalDays || 0;
         this.progressPercentage = this.totalDays > 0 
@@ -122,6 +124,27 @@ export class ProjectDetailComponent implements OnInit, AfterViewInit, OnDestroy 
           });
         }
 
+        // Preload the banner image to avoid showing static image first
+        if (project.image) {
+          this.isBannerImageLoading = true;
+          const img = new Image();
+          img.onload = () => {
+            // Image is fully loaded, now set it (this prevents the flash)
+            this.bannerImage = project.image!;
+            this.isBannerImageLoading = false;
+          };
+          img.onerror = () => {
+            // Image failed to load, set to null (no fallback)
+            this.bannerImage = null;
+            this.isBannerImageLoading = false;
+          };
+          img.src = project.image;
+        } else {
+          // No image, set to null
+          this.bannerImage = null;
+          this.isBannerImageLoading = false;
+        }
+        
         this.isLoading = false;
       },
       error: (err) => {
@@ -140,6 +163,11 @@ export class ProjectDetailComponent implements OnInit, AfterViewInit, OnDestroy 
 
     this.camerasService.getCamerasByProjectId(this.projectId).subscribe({
       next: (cameras) => {
+        // Clear any existing images to prevent static image flash
+        cameras.forEach(camera => {
+          camera.image = null;
+          camera.thumbnail = null;
+        });
         this.cameras = cameras;
         // If we already have developerTag and projectTag, load images immediately
         if (this.project && this.developerTag && this.project.projectTag) {
@@ -244,21 +272,36 @@ export class ProjectDetailComponent implements OnInit, AfterViewInit, OnDestroy 
               camera.lastPhotoTime = this.formatTimestampToTime(result.lastPhotoTimestamp);
               // Calculate and update status based on last photo timestamp
               camera.status = this.calculateStatusFromTimestamp(result.lastPhotoTimestamp);
-              // Set image URL if available
+              // Preload image before setting to avoid static image flash
               if (result.imageUrl) {
-                camera.image = result.imageUrl;
-                camera.thumbnail = result.imageUrl;
+                const img = new Image();
+                img.onload = () => {
+                  // Image is fully loaded, now set it
+                  camera.image = result.imageUrl!;
+                  camera.thumbnail = result.imageUrl!;
+                  this.loadingImages.delete(camera.id);
+                };
+                img.onerror = () => {
+                  // Image failed to load
+                  camera.image = null;
+                  camera.thumbnail = null;
+                  this.loadingImages.delete(camera.id);
+                };
+                img.src = result.imageUrl;
+                // Keep in loading state until image preloads
+              } else {
+                // No image URL, remove from loading
+                this.loadingImages.delete(camera.id);
               }
             } else {
-              // No timestamp means no images - set status to 'Removed' and use NO_IMAGE
+              // No timestamp means no images - set status to 'Removed' and set image to null
               camera.status = 'Removed';
-              camera.image = NO_IMAGE;
-              camera.thumbnail = NO_IMAGE;
+              camera.image = null;
+              camera.thumbnail = null;
               camera.lastPhotoDate = 'N/A';
               camera.lastPhotoTime = 'N/A';
             }
-            // Remove from loading set when image URL is set
-            this.loadingImages.delete(camera.id);
+            // Loading state is managed in the preload handlers above
           }
         },
         error: (err) => {
@@ -268,8 +311,8 @@ export class ProjectDetailComponent implements OnInit, AfterViewInit, OnDestroy 
           if (camera) {
             // If we can't load the last photo (likely no images exist), set status to 'Removed'
             camera.status = 'Removed';
-            camera.image = NO_IMAGE;
-            camera.thumbnail = NO_IMAGE;
+            camera.image = null;
+            camera.thumbnail = null;
             camera.lastPhotoDate = 'N/A';
             camera.lastPhotoTime = 'N/A';
             this.loadingImages.delete(camera.id);
@@ -450,10 +493,9 @@ export class ProjectDetailComponent implements OnInit, AfterViewInit, OnDestroy 
 
   onImageError(event: Event, camera: Camera) {
     this.loadingImages.delete(camera.id); // Image failed to load
-    // Use NO_IMAGE if status is Removed, otherwise use PROJECT_IMAGE
-    const fallbackImage = camera.status === 'Removed' ? NO_IMAGE : PROJECT_IMAGE;
-    camera.image = fallbackImage;
-    camera.thumbnail = fallbackImage;
+    // Remove image on error - show skeleton/placeholder instead
+    camera.image = null;
+    camera.thumbnail = null;
     if (camera.status !== 'Removed') {
       camera.status = 'Stopped'; // Set status to stopped on image error (unless already Removed)
     }

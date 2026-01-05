@@ -1,6 +1,17 @@
 <div class="camera-detail-page">
+  <!-- Action Bar Skeleton -->
+  <div class="action-bar skeleton" *ngIf="isLoading">
+    <div class="camera-info">
+      <div class="skeleton-title"></div>
+      <div class="skeleton-badge"></div>
+    </div>
+    <div class="action-buttons">
+      <div class="skeleton-action-btn" *ngFor="let i of [1,2,3,4,5]"></div>
+    </div>
+  </div>
+
   <!-- Action Bar -->
-  <div class="action-bar">
+  <div class="action-bar" *ngIf="!isLoading">
     <div class="camera-info">
       <h2 class="camera-title">
         {{ cameraName }}
@@ -50,7 +61,7 @@
   </div>
 
   <!-- New Standalone Date Picker -->
-  <div class="new-date-picker-container">
+  <div class="new-date-picker-container" *ngIf="!isLoading">
     <div class="new-date-picker-button" (click)="openDatePickerModal()">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
         <rect x="2" y="3" width="12" height="11" rx="2" stroke="currentColor" stroke-width="1.5"/>
@@ -61,6 +72,11 @@
         <path d="M4 6L8 10L12 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
     </div>
+  </div>
+
+  <!-- Date Picker Skeleton -->
+  <div class="new-date-picker-container skeleton" *ngIf="isLoading">
+    <div class="skeleton-date-picker"></div>
   </div>
 
   <!-- Date Picker Modal -->
@@ -94,7 +110,7 @@
   <div class="main-content">
     <div class="content-wrapper">
       <!-- Left Sidebar - Weather Info -->
-      <div class="weather-sidebar">
+      <div class="weather-sidebar" *ngIf="!isLoading">
         <div class="weather-icon">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M12 2V4M12 20V22M4 12H2M6.314 6.314L4.9 4.9M17.686 17.686L19.1 19.1M22 12H20M17.686 6.314L19.1 4.9M6.314 17.686L4.9 19.1" stroke="#FFE2A3" stroke-width="2" stroke-linecap="round"/>
@@ -114,11 +130,20 @@
         </div>
       </div>
 
+      <!-- Weather Sidebar Skeleton -->
+      <div class="weather-sidebar skeleton" *ngIf="isLoading">
+        <div class="skeleton-weather-icon"></div>
+        <div class="skeleton-weather-info">
+          <div class="skeleton-weather-item"></div>
+          <div class="skeleton-weather-item"></div>
+        </div>
+      </div>
+
       <!-- Center - Image Carousel -->
       <div class="image-carousel-container">
-        <!-- Loading State -->
-        <div *ngIf="isLoading" class="loading-state">
-          <p>Loading images...</p>
+        <!-- Carousel Skeleton -->
+        <div *ngIf="isLoading" class="carousel-skeleton">
+          <div class="skeleton-carousel-image"></div>
         </div>
         
         <!-- Empty State -->

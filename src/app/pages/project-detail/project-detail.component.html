@@ -19,9 +19,25 @@
     </div>
   </div>
 
+  <!-- Banner Skeleton -->
+  <div class="project-header-banner skeleton" *ngIf="isLoading || isBannerImageLoading">
+    <div class="banner-skeleton-content">
+      <div class="skeleton-title"></div>
+      <div class="skeleton-progress">
+        <div class="skeleton-text"></div>
+        <div class="skeleton-bar"></div>
+        <div class="skeleton-labels">
+          <div class="skeleton-label"></div>
+          <div class="skeleton-label"></div>
+        </div>
+        <div class="skeleton-percentage"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- Project Header Banner -->
-  <div class="project-header-banner">
-    <div class="banner-image" [style.background-image]="'url(' + bannerImage + ')'">
+  <div class="project-header-banner" *ngIf="!isLoading && !isBannerImageLoading">
+    <div class="banner-image" [style.background-image]="bannerImage ? 'url(' + bannerImage + ')' : 'none'">
       <div class="banner-overlay"></div>
     </div>
     <div class="banner-content">
@@ -105,11 +121,6 @@
         </div>
       </div>
 
-      <!-- Loading State -->
-      <div *ngIf="isLoadingCameras && viewMode === 'list'" class="loading-state">
-        <p>Loading cameras...</p>
-      </div>
-
       <!-- Error State -->
       <div *ngIf="error && !isLoadingCameras && viewMode === 'list'" class="error-state">
         <p>{{ error }}</p>
@@ -118,6 +129,26 @@
       <!-- Empty State -->
       <div *ngIf="!isLoadingCameras && !error && cameras.length === 0 && viewMode === 'list'" class="empty-state">
         <p>No cameras found for this project.</p>
+      </div>
+
+      <!-- Camera Cards Skeleton -->
+      <div class="cameras-grid" *ngIf="isLoadingCameras && viewMode === 'list'">
+        <div class="camera-card skeleton" *ngFor="let i of [1,2,3,4,5,6]">
+          <div class="skeleton-badge"></div>
+          <div class="skeleton-camera-name"></div>
+          <div class="skeleton-image"></div>
+          <div class="skeleton-details">
+            <div class="skeleton-detail-item">
+              <div class="skeleton-detail-label"></div>
+              <div class="skeleton-detail-value"></div>
+            </div>
+            <div class="skeleton-detail-item">
+              <div class="skeleton-detail-label"></div>
+              <div class="skeleton-detail-value"></div>
+            </div>
+          </div>
+          <div class="skeleton-button"></div>
+        </div>
       </div>
 
       <div class="cameras-grid" *ngIf="!isLoadingCameras && !error && viewMode === 'list'">
@@ -138,15 +169,16 @@
           
           <div class="camera-image-container">
             <img 
-              [src]="camera.image || ''" 
+              *ngIf="camera.image"
+              [src]="camera.image" 
               [alt]="camera.name" 
               class="camera-image"
               (load)="onImageLoad($event, camera.id)"
               (error)="onImageError($event, camera)"
-              [style.opacity]="camera.image && !loadingImages.has(camera.id) ? '1' : '0'"
+              [style.opacity]="!loadingImages.has(camera.id) ? '1' : '0'"
             />
-            <div *ngIf="loadingImages.has(camera.id) || !camera.image" class="image-loading-placeholder">
-              <div class="loading-spinner"></div>
+            <div *ngIf="loadingImages.has(camera.id) || !camera.image" class="image-loading-placeholder skeleton-image">
+              <div class="loading-spinner" *ngIf="loadingImages.has(camera.id)"></div>
             </div>
             <div class="quick-view-overlay" *ngIf="hoveredCameraId === camera.id">
               <button class="quick-view-btn" (click)="openQuickView(camera, $event)">

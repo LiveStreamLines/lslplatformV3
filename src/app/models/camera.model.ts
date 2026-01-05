@@ -11,8 +11,8 @@ export interface Camera {
   developer: string; // Developer ID
   projectTag?: string; // Project tag (for S3 paths)
   developerTag?: string; // Developer tag (for S3 paths)
-  image?: string;
-  thumbnail?: string;
+  image?: string | null;
+  thumbnail?: string | null;
   status: 'Online' | 'Offline' | 'Stopped' | 'Removed';
   installedDate: string;
   lastPhotoDate?: string;
