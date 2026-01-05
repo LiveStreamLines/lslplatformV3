@@ -39,7 +39,9 @@ export class CameraDetailComponent implements OnInit {
   currentImageIndex = 0;
   
   images: string[] = [];
+  imageTimestamps: string[] = []; // Store timestamps for each image
   isLoading = false;
+  loadingProgress = 0; // Loading progress percentage (0-100)
   error: string | null = null;
   isFullscreen = false;
 
@@ -60,6 +62,7 @@ export class CameraDetailComponent implements OnInit {
 
   loadCameraData() {
     this.isLoading = true;
+    this.loadingProgress = 0;
     this.error = null;
 
     this.camerasService.getCameraById(this.cameraId!).subscribe({
@@ -140,14 +143,43 @@ export class CameraDetailComponent implements OnInit {
         
         if (allPhotos.length > 0) {
           const sortedPhotos = allPhotos.sort((a, b) => b.localeCompare(a));
-          this.images = sortedPhotos.map(timestamp =>
-            this.cameraPicsService.getProxiedImageUrl(developerTag, projectTag, cameraTag, timestamp)
-          );
-          this.currentImageIndex = sortedPhotos.length - 1; // Start with latest
+          this.imageTimestamps = sortedPhotos;
+          this.loadingProgress = 0;
+          
+          // Load the last (most recent) image first and wait for it to fully load
+          const lastTimestamp = sortedPhotos[sortedPhotos.length - 1];
+          const lastImageUrl = this.cameraPicsService.getProxiedImageUrl(developerTag, projectTag, cameraTag, lastTimestamp);
+          
+          // Preload the last image first to ensure it's ready before hiding loading
+          const img = new Image();
+          img.onload = () => {
+            // Image is fully loaded, now set all images and hide loading
+            this.images = sortedPhotos.map(timestamp =>
+              this.cameraPicsService.getProxiedImageUrl(developerTag, projectTag, cameraTag, timestamp)
+            );
+            this.currentImageIndex = sortedPhotos.length - 1; // Start with latest
+            this.loadingProgress = 100;
+            this.isLoading = false;
+          };
+          img.onerror = () => {
+            // Even if last image fails, still show the list
+            this.images = sortedPhotos.map(timestamp =>
+              this.cameraPicsService.getProxiedImageUrl(developerTag, projectTag, cameraTag, timestamp)
+            );
+            this.currentImageIndex = sortedPhotos.length - 1;
+            this.loadingProgress = 100;
+            this.isLoading = false;
+          };
+          img.onprogress = (e) => {
+            if (e.lengthComputable) {
+              // Update progress based on image load progress
+              this.loadingProgress = Math.min(90, (e.loaded / e.total) * 90);
+            }
+          };
+          img.src = lastImageUrl;
         } else {
           this.loadRecentImages(developerTag, projectTag, cameraTag);
         }
-        this.isLoading = false;
       },
       error: (err) => {
         console.error('Error loading today\'s images:', err);
@@ -165,14 +197,46 @@ export class CameraDetailComponent implements OnInit {
         
         if (allPhotos.length > 0) {
           const sortedPhotos = allPhotos.sort((a, b) => b.localeCompare(a));
-          this.images = sortedPhotos.map(timestamp =>
-            this.cameraPicsService.getProxiedImageUrl(developerTag, projectTag, cameraTag, timestamp)
-          );
-          this.currentImageIndex = 0;
+          this.imageTimestamps = sortedPhotos;
+          this.loadingProgress = 0;
+          
+          // Load the last (most recent) image first and wait for it to fully load
+          const lastTimestamp = sortedPhotos[sortedPhotos.length - 1];
+          const lastImageUrl = this.cameraPicsService.getProxiedImageUrl(developerTag, projectTag, cameraTag, lastTimestamp);
+          
+          // Preload the last image first to ensure it's ready before hiding loading
+          const img = new Image();
+          img.onload = () => {
+            // Image is fully loaded, now set all images and hide loading
+            this.images = sortedPhotos.map(timestamp =>
+              this.cameraPicsService.getProxiedImageUrl(developerTag, projectTag, cameraTag, timestamp)
+            );
+            this.currentImageIndex = sortedPhotos.length - 1; // Start with latest
+            this.loadingProgress = 100;
+            this.isLoading = false;
+          };
+          img.onerror = () => {
+            // Even if last image fails, still show the list
+            this.images = sortedPhotos.map(timestamp =>
+              this.cameraPicsService.getProxiedImageUrl(developerTag, projectTag, cameraTag, timestamp)
+            );
+            this.currentImageIndex = sortedPhotos.length - 1;
+            this.loadingProgress = 100;
+            this.isLoading = false;
+          };
+          img.onprogress = (e) => {
+            if (e.lengthComputable) {
+              // Update progress based on image load progress
+              this.loadingProgress = Math.min(90, (e.loaded / e.total) * 90);
+            }
+          };
+          img.src = lastImageUrl;
         } else {
           this.images = [PROJECT_IMAGE];
+          this.imageTimestamps = [];
+          this.loadingProgress = 100;
+          this.isLoading = false;
         }
-        this.isLoading = false;
       },
       error: (err) => {
         console.error('Error loading images for date:', err);
@@ -198,14 +262,43 @@ export class CameraDetailComponent implements OnInit {
         
         if (allPhotos.length > 0) {
           const sortedPhotos = allPhotos.sort((a, b) => b.localeCompare(a)).slice(0, 50);
-          this.images = sortedPhotos.map(timestamp =>
-            this.cameraPicsService.getProxiedImageUrl(developerTag, projectTag, cameraTag, timestamp)
-          );
-          this.currentImageIndex = 0;
+          this.imageTimestamps = sortedPhotos;
+          this.loadingProgress = 0;
+          
+          // Load the last (most recent) image first and wait for it to fully load
+          const lastTimestamp = sortedPhotos[sortedPhotos.length - 1];
+          const lastImageUrl = this.cameraPicsService.getProxiedImageUrl(developerTag, projectTag, cameraTag, lastTimestamp);
+          
+          // Preload the last image first to ensure it's ready before hiding loading
+          const img = new Image();
+          img.onload = () => {
+            // Image is fully loaded, now set all images and hide loading
+            this.images = sortedPhotos.map(timestamp =>
+              this.cameraPicsService.getProxiedImageUrl(developerTag, projectTag, cameraTag, timestamp)
+            );
+            this.currentImageIndex = sortedPhotos.length - 1; // Start with latest
+            this.loadingProgress = 100;
+            this.isLoading = false;
+          };
+          img.onerror = () => {
+            // Even if last image fails, still show the list
+            this.images = sortedPhotos.map(timestamp =>
+              this.cameraPicsService.getProxiedImageUrl(developerTag, projectTag, cameraTag, timestamp)
+            );
+            this.currentImageIndex = sortedPhotos.length - 1;
+            this.loadingProgress = 100;
+            this.isLoading = false;
+          };
+          img.onprogress = (e) => {
+            if (e.lengthComputable) {
+              // Update progress based on image load progress
+              this.loadingProgress = Math.min(90, (e.loaded / e.total) * 90);
+            }
+          };
+          img.src = lastImageUrl;
         } else {
           this.loadLastSingleImage(developerTag, projectTag, cameraTag);
         }
-        this.isLoading = false;
       },
       error: (err) => {
         console.error('Error loading recent images:', err);
@@ -219,15 +312,36 @@ export class CameraDetailComponent implements OnInit {
       next: (imageUrl) => {
         if (imageUrl) {
           this.images = [imageUrl];
+          // Try to extract timestamp from URL (format: .../YYYYMMDDHHMMSS.jpg)
+          const timestampMatch = imageUrl.match(/(\d{14})\.jpg/);
+          if (timestampMatch) {
+            this.imageTimestamps = [timestampMatch[1]];
+          } else {
+            // Try to get from cache service
+            this.cameraPicsService.getCameraPictures(developerTag, projectTag, cameraTag).subscribe({
+              next: (response) => {
+                if (response.lastPhoto) {
+                  this.imageTimestamps = [response.lastPhoto];
+                } else {
+                  this.imageTimestamps = [];
+                }
+              },
+              error: () => {
+                this.imageTimestamps = [];
+              }
+            });
+          }
           this.currentImageIndex = 0;
         } else {
           this.images = [PROJECT_IMAGE];
+          this.imageTimestamps = [];
         }
         this.isLoading = false;
       },
       error: (err) => {
         console.error('Error loading last image:', err);
         this.images = [PROJECT_IMAGE];
+        this.imageTimestamps = [];
         this.isLoading = false;
       }
     });
@@ -428,4 +542,27 @@ export class CameraDetailComponent implements OnInit {
     }
   }
 
+  /**
+   * Format timestamp (YYYYMMDDHHMMSS) to date string (DD-MMM-YYYY)
+   */
+  formatTimestampToDate(timestamp: string): string {
+    if (!timestamp || timestamp.length < 8) return '';
+    const year = timestamp.substring(0, 4);
+    const month = timestamp.substring(4, 6);
+    const day = timestamp.substring(6, 8);
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthIndex = parseInt(month, 10) - 1;
+    return `${day}-${monthNames[monthIndex]}-${year}`;
+  }
+
+  /**
+   * Format timestamp (YYYYMMDDHHMMSS) to time string (HH:MM:SS)
+   */
+  formatTimestampToTime(timestamp: string): string {
+    if (!timestamp || timestamp.length < 14) return '';
+    const hour = timestamp.substring(8, 10);
+    const minute = timestamp.substring(10, 12);
+    const second = timestamp.substring(12, 14);
+    return `${hour}:${minute}:${second}`;
+  }
 }

@@ -141,9 +141,17 @@
 
       <!-- Center - Image Carousel -->
       <div class="image-carousel-container">
-        <!-- Carousel Skeleton -->
-        <div *ngIf="isLoading" class="carousel-skeleton">
-          <div class="skeleton-carousel-image"></div>
+        <!-- Loading Indicator -->
+        <div *ngIf="isLoading" class="carousel-loading">
+          <div class="loading-spinner-container">
+            <div class="loading-spinner"></div>
+            <div class="loading-progress-container">
+              <div class="loading-progress-bar">
+                <div class="loading-progress-fill" [style.width.%]="loadingProgress"></div>
+              </div>
+              <p class="loading-text">{{ loadingProgress }}%</p>
+            </div>
+          </div>
         </div>
         
         <!-- Empty State -->
@@ -159,6 +167,10 @@
                [class.prev]="i === currentImageIndex - 1"
                [class.next]="i === currentImageIndex + 1">
             <img [src]="image" [alt]="'Image ' + (i + 1)" />
+            <div class="image-timestamp-overlay" *ngIf="i === currentImageIndex && imageTimestamps[i] && image">
+              <div class="timestamp-date">{{ formatTimestampToDate(imageTimestamps[i]) }}</div>
+              <div class="timestamp-time">{{ formatTimestampToTime(imageTimestamps[i]) }}</div>
+            </div>
           </div>
         </div>
         <button class="fullscreen-btn" (click)="fullscreenImage()">
@@ -230,6 +242,10 @@
   </button>
   <div class="fullscreen-image-container" (click)="$event.stopPropagation()">
     <img [src]="images[currentImageIndex]" [alt]="'Image ' + (currentImageIndex + 1)" class="fullscreen-image" />
+    <div class="fullscreen-timestamp" *ngIf="imageTimestamps[currentImageIndex]">
+      <div class="fullscreen-timestamp-date">{{ formatTimestampToDate(imageTimestamps[currentImageIndex]) }}</div>
+      <div class="fullscreen-timestamp-time">{{ formatTimestampToTime(imageTimestamps[currentImageIndex]) }}</div>
+    </div>
     <div class="fullscreen-nav">
       <button 
         class="fullscreen-nav-btn fullscreen-nav-prev" 
