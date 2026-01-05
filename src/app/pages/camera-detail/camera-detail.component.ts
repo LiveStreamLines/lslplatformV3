@@ -1,4 +1,4 @@
-import { Component, OnInit, AfterViewChecked, ViewChild, ElementRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, AfterViewChecked, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
@@ -19,7 +19,7 @@ import { API_CONFIG } from '../../config/api.config';
   templateUrl: './camera-detail.component.html',
   styleUrl: './camera-detail.component.css'
 })
-export class CameraDetailComponent implements OnInit, AfterViewChecked {
+export class CameraDetailComponent implements OnInit, OnDestroy, AfterViewChecked {
   @ViewChild('dateInput', { static: false }) dateInputRef!: ElementRef<HTMLInputElement>;
   @ViewChild('dateInputNew', { static: false }) dateInputNewRef!: ElementRef<HTMLInputElement>;
   @ViewChild('dateInputModal', { static: false }) dateInputModalRef!: ElementRef<HTMLInputElement>;
@@ -767,8 +767,38 @@ export class CameraDetailComponent implements OnInit, AfterViewChecked {
       setTimeout(() => {
         this.updateThumbnailScroll();
       }, 100);
+      // Add click outside listener
+      setTimeout(() => {
+        document.addEventListener('click', this.handleClickOutsideThumbnailStrip);
+      }, 0);
+    } else {
+      // Remove click outside listener
+      document.removeEventListener('click', this.handleClickOutsideThumbnailStrip);
     }
   }
+
+  /**
+   * Close thumbnail strip
+   */
+  closeThumbnailStrip() {
+    this.showThumbnailStrip = false;
+    document.removeEventListener('click', this.handleClickOutsideThumbnailStrip);
+  }
+
+  /**
+   * Handle click outside thumbnail strip
+   */
+  private handleClickOutsideThumbnailStrip = (event: MouseEvent) => {
+    const target = event.target as HTMLElement;
+    const stripContainer = document.querySelector('.thumbnail-strip-container');
+    const sliderBtn = document.querySelector('.slider-btn');
+    
+    // Close if clicking outside the strip and not on the slider button
+    if (stripContainer && !stripContainer.contains(target) && 
+        sliderBtn && !sliderBtn.contains(target)) {
+      this.closeThumbnailStrip();
+    }
+  };
 
   /**
    * Update thumbnail scroll limits
@@ -879,5 +909,13 @@ export class CameraDetailComponent implements OnInit, AfterViewChecked {
     } else if (!this.showThumbnailStrip) {
       this.thumbnailScrollListenerAdded = false;
     }
+  }
+
+  /**
+   * Cleanup on component destroy
+   */
+  ngOnDestroy() {
+    // Remove click outside listener if component is destroyed
+    document.removeEventListener('click', this.handleClickOutsideThumbnailStrip);
   }
 }

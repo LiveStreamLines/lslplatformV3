@@ -1813,6 +1813,35 @@
   box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
 }
 
+.thumbnail-close-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #eef2f6;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  z-index: 1001;
+  flex-shrink: 0;
+}
+
+.thumbnail-close-btn:hover {
+  background: #e0e7ef;
+  transform: scale(1.1);
+}
+
+.thumbnail-close-btn svg {
+  width: 12px;
+  height: 12px;
+  color: #364152;
+}
+
 .thumbnail-strip-container::before,
 .thumbnail-strip-container::after {
   content: '';

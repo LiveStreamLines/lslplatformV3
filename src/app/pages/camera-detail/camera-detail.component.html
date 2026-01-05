@@ -237,7 +237,12 @@
     </div>
 
     <!-- Thumbnail Strip -->
-    <div class="thumbnail-strip-container" *ngIf="showThumbnailStrip && images.length > 0">
+    <div class="thumbnail-strip-container" *ngIf="showThumbnailStrip && images.length > 0" (click)="$event.stopPropagation()">
+      <button class="thumbnail-close-btn" (click)="closeThumbnailStrip()" title="Close thumbnail strip">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 4L4 12M4 4L12 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
       <button class="thumbnail-nav-btn thumbnail-nav-prev" (click)="scrollThumbnails('prev')" [disabled]="thumbnailScrollLeft === 0">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M10 3L5 8L10 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
