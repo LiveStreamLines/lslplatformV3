@@ -1,6 +1,7 @@
-import { Component, OnInit, ViewChild, ElementRef } from '@angular/core';
+import { Component, OnInit, AfterViewChecked, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule, ActivatedRoute } from '@angular/router';
+import { FormsModule } from '@angular/forms';
+import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
@@ -14,14 +15,15 @@ import { API_CONFIG } from '../../config/api.config';
 @Component({
   selector: 'app-camera-detail',
   standalone: true,
-  imports: [CommonModule, RouterModule],
+  imports: [CommonModule, RouterModule, FormsModule],
   templateUrl: './camera-detail.component.html',
   styleUrl: './camera-detail.component.css'
 })
-export class CameraDetailComponent implements OnInit {
+export class CameraDetailComponent implements OnInit, AfterViewChecked {
   @ViewChild('dateInput', { static: false }) dateInputRef!: ElementRef<HTMLInputElement>;
   @ViewChild('dateInputNew', { static: false }) dateInputNewRef!: ElementRef<HTMLInputElement>;
   @ViewChild('dateInputModal', { static: false }) dateInputModalRef!: ElementRef<HTMLInputElement>;
+  @ViewChild('thumbnailStrip', { static: false }) thumbnailStripRef!: ElementRef<HTMLDivElement>;
   
   // Expose console to template for debugging
   console = console;
@@ -30,6 +32,7 @@ export class CameraDetailComponent implements OnInit {
   camera: Camera | null = null;
   cameraName = 'Loading...';
   cameraStatus: 'Online' | 'Offline' | 'Stopped' | 'Removed' = 'Stopped';
+  projectId: string | null = null;
   selectedDate = '';
   selectedTime = '';
   selectedDateObj: Date = new Date();
@@ -45,8 +48,39 @@ export class CameraDetailComponent implements OnInit {
   error: string | null = null;
   isFullscreen = false;
 
+  // Thumbnail Strip
+  showThumbnailStrip = false;
+  thumbnailScrollLeft = 0;
+  maxThumbnailScroll = 0;
+  private thumbnailScrollListenerAdded = false;
+
+  // Video Generation Modal
+  showVideoGenerationModal = false;
+  videoFromDate: Date = new Date();
+  videoFromTime: string = '00:00:00';
+  videoToDate: Date = new Date();
+  videoToTime: string = '23:59:59';
+  videoResolution: string = '720';
+  videoDuration: string = '1 Minute';
+  showDateInVideo: boolean = false;
+  showTimeInVideo: boolean = true;
+  videoOverlayType: 'text' | 'logo' | 'watermark' | null = null;
+  videoBrightness: number = 42;
+  videoContrast: number = 42;
+  videoSaturation: number = 42;
+
+  // Photo Generation Modal
+  showPhotoGenerationModal = false;
+  photoFromDate: Date = new Date();
+  photoFromTime: string = '00:00:00';
+  photoToDate: Date = new Date();
+  photoToTime: string = '23:59:59';
+  showDateInPhoto: boolean = false;
+  showTimeInPhoto: boolean = true;
+
   constructor(
     private route: ActivatedRoute,
+    private router: Router,
     private http: HttpClient,
     private camerasService: CamerasService,
     private cameraPicsService: CameraPicsService,
@@ -70,6 +104,7 @@ export class CameraDetailComponent implements OnInit {
         this.camera = camera;
         this.cameraName = camera.name || camera.camera || 'Camera';
         this.cameraStatus = camera.status;
+        this.projectId = camera.project || null;
         
         // Initialize date to today
         this.selectedDateObj = new Date();
@@ -150,16 +185,22 @@ export class CameraDetailComponent implements OnInit {
           const lastTimestamp = sortedPhotos[sortedPhotos.length - 1];
           const lastImageUrl = this.cameraPicsService.getProxiedImageUrl(developerTag, projectTag, cameraTag, lastTimestamp);
           
-          // Preload the last image first to ensure it's ready before hiding loading
+          // Simulate progress and preload the last image first
+          this.simulateProgress();
+          
           const img = new Image();
           img.onload = () => {
-            // Image is fully loaded, now set all images and hide loading
+            // Image is fully loaded, now set all images
             this.images = sortedPhotos.map(timestamp =>
               this.cameraPicsService.getProxiedImageUrl(developerTag, projectTag, cameraTag, timestamp)
             );
             this.currentImageIndex = sortedPhotos.length - 1; // Start with latest
             this.loadingProgress = 100;
-            this.isLoading = false;
+            
+            // Wait a bit more to ensure images are ready before hiding loading
+            setTimeout(() => {
+              this.isLoading = false;
+            }, 300);
           };
           img.onerror = () => {
             // Even if last image fails, still show the list
@@ -168,13 +209,9 @@ export class CameraDetailComponent implements OnInit {
             );
             this.currentImageIndex = sortedPhotos.length - 1;
             this.loadingProgress = 100;
-            this.isLoading = false;
-          };
-          img.onprogress = (e) => {
-            if (e.lengthComputable) {
-              // Update progress based on image load progress
-              this.loadingProgress = Math.min(90, (e.loaded / e.total) * 90);
-            }
+            setTimeout(() => {
+              this.isLoading = false;
+            }, 300);
           };
           img.src = lastImageUrl;
         } else {
@@ -204,16 +241,22 @@ export class CameraDetailComponent implements OnInit {
           const lastTimestamp = sortedPhotos[sortedPhotos.length - 1];
           const lastImageUrl = this.cameraPicsService.getProxiedImageUrl(developerTag, projectTag, cameraTag, lastTimestamp);
           
-          // Preload the last image first to ensure it's ready before hiding loading
+          // Simulate progress and preload the last image first
+          this.simulateProgress();
+          
           const img = new Image();
           img.onload = () => {
-            // Image is fully loaded, now set all images and hide loading
+            // Image is fully loaded, now set all images
             this.images = sortedPhotos.map(timestamp =>
               this.cameraPicsService.getProxiedImageUrl(developerTag, projectTag, cameraTag, timestamp)
             );
             this.currentImageIndex = sortedPhotos.length - 1; // Start with latest
             this.loadingProgress = 100;
-            this.isLoading = false;
+            
+            // Wait a bit more to ensure images are ready before hiding loading
+            setTimeout(() => {
+              this.isLoading = false;
+            }, 300);
           };
           img.onerror = () => {
             // Even if last image fails, still show the list
@@ -222,13 +265,9 @@ export class CameraDetailComponent implements OnInit {
             );
             this.currentImageIndex = sortedPhotos.length - 1;
             this.loadingProgress = 100;
-            this.isLoading = false;
-          };
-          img.onprogress = (e) => {
-            if (e.lengthComputable) {
-              // Update progress based on image load progress
-              this.loadingProgress = Math.min(90, (e.loaded / e.total) * 90);
-            }
+            setTimeout(() => {
+              this.isLoading = false;
+            }, 300);
           };
           img.src = lastImageUrl;
         } else {
@@ -269,16 +308,22 @@ export class CameraDetailComponent implements OnInit {
           const lastTimestamp = sortedPhotos[sortedPhotos.length - 1];
           const lastImageUrl = this.cameraPicsService.getProxiedImageUrl(developerTag, projectTag, cameraTag, lastTimestamp);
           
-          // Preload the last image first to ensure it's ready before hiding loading
+          // Simulate progress and preload the last image first
+          this.simulateProgress();
+          
           const img = new Image();
           img.onload = () => {
-            // Image is fully loaded, now set all images and hide loading
+            // Image is fully loaded, now set all images
             this.images = sortedPhotos.map(timestamp =>
               this.cameraPicsService.getProxiedImageUrl(developerTag, projectTag, cameraTag, timestamp)
             );
             this.currentImageIndex = sortedPhotos.length - 1; // Start with latest
             this.loadingProgress = 100;
-            this.isLoading = false;
+            
+            // Wait a bit more to ensure images are ready before hiding loading
+            setTimeout(() => {
+              this.isLoading = false;
+            }, 300);
           };
           img.onerror = () => {
             // Even if last image fails, still show the list
@@ -287,13 +332,9 @@ export class CameraDetailComponent implements OnInit {
             );
             this.currentImageIndex = sortedPhotos.length - 1;
             this.loadingProgress = 100;
-            this.isLoading = false;
-          };
-          img.onprogress = (e) => {
-            if (e.lengthComputable) {
-              // Update progress based on image load progress
-              this.loadingProgress = Math.min(90, (e.loaded / e.total) * 90);
-            }
+            setTimeout(() => {
+              this.isLoading = false;
+            }, 300);
           };
           img.src = lastImageUrl;
         } else {
@@ -543,6 +584,30 @@ export class CameraDetailComponent implements OnInit {
   }
 
   /**
+   * Simulate loading progress to show percentage
+   */
+  simulateProgress() {
+    let progress = 0;
+    const interval = setInterval(() => {
+      progress += Math.random() * 15; // Increment by random amount (0-15%)
+      if (progress >= 90) {
+        progress = 90; // Stop at 90%, wait for actual image load
+        clearInterval(interval);
+      }
+      this.loadingProgress = Math.min(Math.round(progress), 90);
+    }, 200); // Update every 200ms
+  }
+
+  /**
+   * Navigate back to project detail page
+   */
+  navigateToProject() {
+    if (this.projectId) {
+      this.router.navigate(['/project', this.projectId]);
+    }
+  }
+
+  /**
    * Format timestamp (YYYYMMDDHHMMSS) to date string (DD-MMM-YYYY)
    */
   formatTimestampToDate(timestamp: string): string {
@@ -564,5 +629,255 @@ export class CameraDetailComponent implements OnInit {
     const minute = timestamp.substring(10, 12);
     const second = timestamp.substring(12, 14);
     return `${hour}:${minute}:${second}`;
+  }
+
+  /**
+   * Open video generation modal
+   */
+  openVideoGenerationModal() {
+    // Initialize with current date/time
+    this.videoFromDate = new Date();
+    this.videoToDate = new Date();
+    this.videoFromTime = '00:00:00';
+    this.videoToTime = '23:59:59';
+    this.showVideoGenerationModal = true;
+    document.body.style.overflow = 'hidden';
+  }
+
+  /**
+   * Close video generation modal
+   */
+  closeVideoGenerationModal(event?: Event) {
+    if (event) {
+      event.stopPropagation();
+    }
+    this.showVideoGenerationModal = false;
+    document.body.style.overflow = '';
+  }
+
+  /**
+   * Format date for video picker display (DD-MMM-YYYY)
+   */
+  formatDateForVideo(date: Date): string {
+    const day = String(date.getDate()).padStart(2, '0');
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = months[date.getMonth()];
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
+  }
+
+  /**
+   * Format time for video picker display (HH:MM:SS)
+   */
+  formatTimeForVideo(time: string): string {
+    return time;
+  }
+
+  /**
+   * Generate video with current settings
+   */
+  generateVideo() {
+    // TODO: Implement video generation API call
+    console.log('Generating video with settings:', {
+      fromDate: this.videoFromDate,
+      fromTime: this.videoFromTime,
+      toDate: this.videoToDate,
+      toTime: this.videoToTime,
+      resolution: this.videoResolution,
+      duration: this.videoDuration,
+      showDate: this.showDateInVideo,
+      showTime: this.showTimeInVideo,
+      overlayType: this.videoOverlayType,
+      brightness: this.videoBrightness,
+      contrast: this.videoContrast,
+      saturation: this.videoSaturation
+    });
+    
+    // Close modal after generation starts
+    // this.closeVideoGenerationModal();
+  }
+
+  /**
+   * Open photo generation modal
+   */
+  openPhotoGenerationModal() {
+    // Initialize with current date/time
+    this.photoFromDate = new Date();
+    this.photoToDate = new Date();
+    this.photoFromTime = '00:00:00';
+    this.photoToTime = '23:59:59';
+    this.showPhotoGenerationModal = true;
+    document.body.style.overflow = 'hidden';
+  }
+
+  /**
+   * Close photo generation modal
+   */
+  closePhotoGenerationModal(event?: Event) {
+    if (event) {
+      event.stopPropagation();
+    }
+    this.showPhotoGenerationModal = false;
+    document.body.style.overflow = '';
+  }
+
+  /**
+   * Format date for photo picker display (DD-MMM-YYYY)
+   */
+  formatDateForPhoto(date: Date): string {
+    const day = String(date.getDate()).padStart(2, '0');
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = months[date.getMonth()];
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
+  }
+
+  /**
+   * Format time for photo picker display (HH:MM:SS)
+   */
+  formatTimeForPhoto(time: string): string {
+    return time;
+  }
+
+  /**
+   * Generate photo with current settings
+   */
+  generatePhoto() {
+    // TODO: Implement photo generation API call
+    console.log('Generating photo with settings:', {
+      fromDate: this.photoFromDate,
+      fromTime: this.photoFromTime,
+      toDate: this.photoToDate,
+      toTime: this.photoToTime,
+      showDate: this.showDateInPhoto,
+      showTime: this.showTimeInPhoto
+    });
+    
+    // Close modal after generation starts
+    // this.closePhotoGenerationModal();
+  }
+
+  /**
+   * Toggle thumbnail strip visibility
+   */
+  toggleThumbnailStrip() {
+    this.showThumbnailStrip = !this.showThumbnailStrip;
+    if (this.showThumbnailStrip) {
+      // Calculate max scroll when strip is shown
+      setTimeout(() => {
+        this.updateThumbnailScroll();
+      }, 100);
+    }
+  }
+
+  /**
+   * Update thumbnail scroll limits
+   */
+  updateThumbnailScroll() {
+    if (this.thumbnailStripRef?.nativeElement) {
+      const strip = this.thumbnailStripRef.nativeElement;
+      const content = strip.querySelector('.thumbnail-strip-content') as HTMLElement;
+      if (content) {
+        this.maxThumbnailScroll = Math.max(0, content.scrollWidth - strip.clientWidth);
+      }
+    }
+  }
+
+  /**
+   * Scroll thumbnails left or right
+   */
+  scrollThumbnails(direction: 'prev' | 'next') {
+    if (!this.thumbnailStripRef?.nativeElement) return;
+
+    const strip = this.thumbnailStripRef.nativeElement;
+    const scrollAmount = 200; // Pixels to scroll per click
+    const currentScroll = strip.scrollLeft;
+
+    if (direction === 'prev') {
+      strip.scrollTo({
+        left: Math.max(0, currentScroll - scrollAmount),
+        behavior: 'smooth'
+      });
+    } else {
+      strip.scrollTo({
+        left: Math.min(this.maxThumbnailScroll, currentScroll + scrollAmount),
+        behavior: 'smooth'
+      });
+    }
+
+    // Update scroll position after animation
+    setTimeout(() => {
+      this.thumbnailScrollLeft = strip.scrollLeft;
+    }, 300);
+  }
+
+  /**
+   * Select thumbnail and update main image
+   */
+  selectThumbnail(index: number) {
+    if (index >= 0 && index < this.images.length) {
+      this.currentImageIndex = index;
+      // Scroll to selected thumbnail if needed
+      this.scrollToThumbnail(index);
+    }
+  }
+
+  /**
+   * Scroll to specific thumbnail
+   */
+  scrollToThumbnail(index: number) {
+    if (!this.thumbnailStripRef?.nativeElement) return;
+
+    const strip = this.thumbnailStripRef.nativeElement;
+    const content = strip.querySelector('.thumbnail-strip-content') as HTMLElement;
+    if (!content) return;
+
+    const thumbnail = content.children[index] as HTMLElement;
+    if (!thumbnail) return;
+
+    const thumbnailLeft = thumbnail.offsetLeft;
+    const thumbnailWidth = thumbnail.offsetWidth;
+    const stripWidth = strip.clientWidth;
+    const currentScroll = strip.scrollLeft;
+
+    // Calculate if thumbnail is visible
+    const thumbnailRight = thumbnailLeft + thumbnailWidth;
+    const visibleLeft = currentScroll;
+    const visibleRight = currentScroll + stripWidth;
+
+    // Scroll if thumbnail is not fully visible
+    if (thumbnailLeft < visibleLeft) {
+      strip.scrollTo({
+        left: thumbnailLeft - 10, // 10px padding
+        behavior: 'smooth'
+      });
+    } else if (thumbnailRight > visibleRight) {
+      strip.scrollTo({
+        left: thumbnailRight - stripWidth + 10, // 10px padding
+        behavior: 'smooth'
+      });
+    }
+
+    setTimeout(() => {
+      this.thumbnailScrollLeft = strip.scrollLeft;
+      this.updateThumbnailScroll();
+    }, 300);
+  }
+
+  /**
+   * Update thumbnail scroll position when main image changes
+   */
+  ngAfterViewChecked() {
+    // Add scroll listener only once when strip becomes visible
+    if (this.showThumbnailStrip && this.images.length > 0 && this.thumbnailStripRef?.nativeElement && !this.thumbnailScrollListenerAdded) {
+      const strip = this.thumbnailStripRef.nativeElement;
+      strip.addEventListener('scroll', () => {
+        this.thumbnailScrollLeft = strip.scrollLeft;
+        this.updateThumbnailScroll();
+      });
+      this.thumbnailScrollListenerAdded = true;
+    } else if (!this.showThumbnailStrip) {
+      this.thumbnailScrollListenerAdded = false;
+    }
   }
 }

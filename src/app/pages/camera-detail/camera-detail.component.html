@@ -1,4 +1,14 @@
 <div class="camera-detail-page">
+  <!-- Back Button -->
+  <div class="back-button-container" *ngIf="!isLoading && projectId">
+    <button class="back-button" (click)="navigateToProject()">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M10 3L5 8L10 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span>Back to Project</span>
+    </button>
+  </div>
+
   <!-- Action Bar Skeleton -->
   <div class="action-bar skeleton" *ngIf="isLoading">
     <div class="camera-info">
@@ -37,13 +47,13 @@
         </svg>
         <span>Studio</span>
       </button>
-      <button class="action-btn">
+      <button class="action-btn" (click)="openVideoGenerationModal()">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M3 4L8 2L13 4V8C13 11.314 10.314 14 7 14C3.686 14 1 11.314 1 8V4L6 2L11 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
         <span>Generate Video</span>
       </button>
-      <button class="action-btn">
+      <button class="action-btn" (click)="openPhotoGenerationModal()">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
           <rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.5"/>
           <path d="M5 8L7 10L11 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -217,12 +227,42 @@
 
     <!-- Bottom Controls -->
     <div class="bottom-controls">
-      <button class="slider-btn">
+      <button class="slider-btn" [class.active]="showThumbnailStrip" (click)="toggleThumbnailStrip()">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
           <rect x="2" y="3" width="12" height="11" rx="2" stroke="currentColor" stroke-width="1.5"/>
           <path d="M5 1V4M11 1V4M2 7H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
         </svg>
         <span>Slider</span>
+      </button>
+    </div>
+
+    <!-- Thumbnail Strip -->
+    <div class="thumbnail-strip-container" *ngIf="showThumbnailStrip && images.length > 0">
+      <button class="thumbnail-nav-btn thumbnail-nav-prev" (click)="scrollThumbnails('prev')" [disabled]="thumbnailScrollLeft === 0">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M10 3L5 8L10 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <div class="thumbnail-strip" #thumbnailStrip>
+        <div class="thumbnail-strip-content">
+          <div 
+            *ngFor="let image of images; let i = index" 
+            class="thumbnail-item"
+            [class.active]="i === currentImageIndex"
+            (click)="selectThumbnail(i)">
+            <div class="thumbnail-image-wrapper">
+              <img [src]="image" [alt]="'Thumbnail ' + (i + 1)" />
+            </div>
+            <div class="thumbnail-timestamp" *ngIf="imageTimestamps[i]">
+              {{ formatTimestampToTime(imageTimestamps[i]) }}
+            </div>
+          </div>
+        </div>
+      </div>
+      <button class="thumbnail-nav-btn thumbnail-nav-next" (click)="scrollThumbnails('next')" [disabled]="thumbnailScrollLeft >= maxThumbnailScroll">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M6 3L11 8L6 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
       </button>
     </div>
   </div>
@@ -266,6 +306,292 @@
     </div>
     <div class="fullscreen-counter">
       {{ currentImageIndex + 1 }} / {{ images.length }}
+    </div>
+  </div>
+</div>
+
+<!-- Video Generation Modal -->
+<div class="video-generation-modal" *ngIf="showVideoGenerationModal" (click)="closeVideoGenerationModal($event)">
+  <div class="video-generation-modal-content" (click)="$event.stopPropagation()">
+    <!-- Close Button -->
+    <button class="video-modal-close-btn" (click)="closeVideoGenerationModal($event)">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M18 6L6 18M6 6L18 18" stroke="#CF1D17" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+
+    <!-- Modal Header -->
+    <div class="video-modal-header">
+      <h3 class="video-modal-title">Generate Video</h3>
+      <button class="video-generate-btn" (click)="generateVideo()">
+        Generate Video
+      </button>
+    </div>
+
+    <!-- Date/Time Range Pickers -->
+    <div class="video-date-range-section">
+      <div class="video-date-range-item">
+        <label class="video-label">From</label>
+        <div class="video-date-time-picker">
+          <div class="video-date-picker-part">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="2" y="3" width="12" height="11" rx="2" stroke="#4b5565" stroke-width="1.5"/>
+              <path d="M5 1V4M11 1V4M2 7H14" stroke="#4b5565" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <span>{{ formatDateForVideo(videoFromDate) }}</span>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M4 6L8 10L12 6" stroke="#5621d2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="video-time-picker-part">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="8" cy="8" r="6" stroke="#4b5565" stroke-width="1.5"/>
+              <path d="M8 4V8L10 10" stroke="#4b5565" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <span>{{ formatTimeForVideo(videoFromTime) }}</span>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M4 6L8 10L12 6" stroke="#5621d2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+      <div class="video-date-range-item">
+        <label class="video-label">To</label>
+        <div class="video-date-time-picker">
+          <div class="video-date-picker-part">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="2" y="3" width="12" height="11" rx="2" stroke="#4b5565" stroke-width="1.5"/>
+              <path d="M5 1V4M11 1V4M2 7H14" stroke="#4b5565" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <span>{{ formatDateForVideo(videoToDate) }}</span>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M4 6L8 10L12 6" stroke="#5621d2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="video-time-picker-part">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="8" cy="8" r="6" stroke="#4b5565" stroke-width="1.5"/>
+              <path d="M8 4V8L10 10" stroke="#4b5565" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <span>{{ formatTimeForVideo(videoToTime) }}</span>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M4 6L8 10L12 6" stroke="#5621d2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings and Preview Section -->
+    <div class="video-settings-preview-section">
+      <!-- Left Sidebar - Settings -->
+      <div class="video-settings-sidebar">
+        <!-- Resolution and Duration -->
+        <div class="video-settings-card">
+          <div class="video-settings-row">
+            <div class="video-setting-item">
+              <label class="video-setting-label">Resolution</label>
+              <div class="video-dropdown">
+                <span>{{ videoResolution }}</span>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M4 6L8 10L12 6" stroke="#5621d2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+            </div>
+            <div class="video-setting-item">
+              <label class="video-setting-label">Duration</label>
+              <div class="video-dropdown">
+                <span>{{ videoDuration }}</span>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M4 6L8 10L12 6" stroke="#5621d2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+            </div>
+          </div>
+          <!-- Show Date/Time Checkboxes -->
+          <div class="video-checkboxes-row">
+            <label class="video-checkbox-label" [class.checked]="showDateInVideo">
+              <input type="checkbox" [(ngModel)]="showDateInVideo" class="video-checkbox-input">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="video-checkbox-icon">
+                <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM10 17L5 12L6.41 10.59L10 14.17L17.59 6.58L19 8L10 17Z" [attr.fill]="showDateInVideo ? '#697586' : 'none'" stroke="#697586" stroke-width="1.5"/>
+              </svg>
+              <span>Show Date</span>
+            </label>
+            <label class="video-checkbox-label" [class.checked]="showTimeInVideo">
+              <input type="checkbox" [(ngModel)]="showTimeInVideo" class="video-checkbox-input">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="video-checkbox-icon">
+                <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM10 17L5 12L6.41 10.59L10 14.17L17.59 6.58L19 8L10 17Z" [attr.fill]="showTimeInVideo ? '#5621d2' : 'none'" stroke="#5621d2" stroke-width="1.5"/>
+              </svg>
+              <span>Show Time</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Overlay Options -->
+        <div class="video-overlay-options">
+          <button class="video-overlay-btn" [class.active]="videoOverlayType === 'text'" (click)="videoOverlayType = 'text'">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M4 6H20M4 12H20M4 18H14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <span>Text</span>
+          </button>
+          <button class="video-overlay-btn" [class.active]="videoOverlayType === 'logo'" (click)="videoOverlayType = 'logo'">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2"/>
+              <path d="M9 9L15 15M15 9L9 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <span>Logo</span>
+          </button>
+          <button class="video-overlay-btn" [class.active]="videoOverlayType === 'watermark'" (click)="videoOverlayType = 'watermark'">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span>Watermark</span>
+          </button>
+        </div>
+
+        <!-- Image Adjustments -->
+        <div class="video-settings-card">
+          <div class="video-slider-item">
+            <label class="video-slider-label">Brightness</label>
+            <div class="video-slider-container">
+              <input type="range" min="0" max="100" [(ngModel)]="videoBrightness" class="video-slider">
+              <div class="video-slider-track">
+                <div class="video-slider-fill" [style.width.%]="videoBrightness"></div>
+                <div class="video-slider-thumb" [style.left.%]="videoBrightness"></div>
+              </div>
+            </div>
+          </div>
+          <div class="video-slider-item">
+            <label class="video-slider-label">Contrast</label>
+            <div class="video-slider-container">
+              <input type="range" min="0" max="100" [(ngModel)]="videoContrast" class="video-slider">
+              <div class="video-slider-track">
+                <div class="video-slider-fill" [style.width.%]="videoContrast"></div>
+                <div class="video-slider-thumb" [style.left.%]="videoContrast"></div>
+              </div>
+            </div>
+          </div>
+          <div class="video-slider-item">
+            <label class="video-slider-label">Saturation</label>
+            <div class="video-slider-container">
+              <input type="range" min="0" max="100" [(ngModel)]="videoSaturation" class="video-slider">
+              <div class="video-slider-track">
+                <div class="video-slider-fill" [style.width.%]="videoSaturation"></div>
+                <div class="video-slider-thumb" [style.left.%]="videoSaturation"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Side - Preview -->
+      <div class="video-preview-container">
+        <div class="video-preview-placeholder">
+          <img [src]="images[currentImageIndex] || ''" [alt]="'Preview'" *ngIf="images.length > 0" />
+          <div class="video-preview-empty" *ngIf="images.length === 0">
+            <p>No preview available</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Photo Generation Modal -->
+<div class="photo-generation-modal" *ngIf="showPhotoGenerationModal" (click)="closePhotoGenerationModal($event)">
+  <div class="photo-generation-modal-content" (click)="$event.stopPropagation()">
+    <!-- Close Button -->
+    <button class="photo-modal-close-btn" (click)="closePhotoGenerationModal($event)">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M18 6L6 18M6 6L18 18" stroke="#CF1D17" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+
+    <!-- Modal Header -->
+    <div class="photo-modal-header">
+      <h3 class="photo-modal-title">Generate Photo</h3>
+    </div>
+
+    <!-- Date/Time Range Pickers -->
+    <div class="photo-date-range-section">
+      <div class="photo-date-range-item">
+        <label class="photo-label">From</label>
+        <div class="photo-date-time-picker">
+          <div class="photo-date-picker-part">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="2" y="3" width="12" height="11" rx="2" stroke="#4b5565" stroke-width="1.5"/>
+              <path d="M5 1V4M11 1V4M2 7H14" stroke="#4b5565" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <span>{{ formatDateForPhoto(photoFromDate) }}</span>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M4 6L8 10L12 6" stroke="#5621d2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="photo-time-picker-part">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="8" cy="8" r="6" stroke="#4b5565" stroke-width="1.5"/>
+              <path d="M8 4V8L10 10" stroke="#4b5565" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <span>{{ formatTimeForPhoto(photoFromTime) }}</span>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M4 6L8 10L12 6" stroke="#5621d2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+      <div class="photo-date-range-item">
+        <label class="photo-label">To</label>
+        <div class="photo-date-time-picker">
+          <div class="photo-date-picker-part">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="2" y="3" width="12" height="11" rx="2" stroke="#4b5565" stroke-width="1.5"/>
+              <path d="M5 1V4M11 1V4M2 7H14" stroke="#4b5565" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <span>{{ formatDateForPhoto(photoToDate) }}</span>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M4 6L8 10L12 6" stroke="#5621d2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="photo-time-picker-part">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="8" cy="8" r="6" stroke="#4b5565" stroke-width="1.5"/>
+              <path d="M8 4V8L10 10" stroke="#4b5565" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <span>{{ formatTimeForPhoto(photoToTime) }}</span>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M4 6L8 10L12 6" stroke="#5621d2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Checkboxes and Generate Button -->
+    <div class="photo-options-section">
+      <div class="photo-checkboxes">
+        <label class="photo-checkbox-label" [class.checked]="showDateInPhoto">
+          <input type="checkbox" [(ngModel)]="showDateInPhoto" class="photo-checkbox-input">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="photo-checkbox-icon">
+            <circle cx="12" cy="12" r="10" [attr.fill]="showDateInPhoto ? '#697586' : 'none'" stroke="#697586" stroke-width="1.5"/>
+            <path *ngIf="showDateInPhoto" d="M10 17L5 12L6.41 10.59L10 14.17L17.59 6.58L19 8L10 17Z" fill="#ffffff"/>
+          </svg>
+          <span>Show Date</span>
+        </label>
+        <label class="photo-checkbox-label" [class.checked]="showTimeInPhoto">
+          <input type="checkbox" [(ngModel)]="showTimeInPhoto" class="photo-checkbox-input">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="photo-checkbox-icon">
+            <circle cx="12" cy="12" r="10" [attr.fill]="showTimeInPhoto ? '#5621d2' : 'none'" stroke="#5621d2" stroke-width="1.5"/>
+            <path *ngIf="showTimeInPhoto" d="M10 17L5 12L6.41 10.59L10 14.17L17.59 6.58L19 8L10 17Z" fill="#ffffff"/>
+          </svg>
+          <span>Show Time</span>
+        </label>
+      </div>
+      <button class="photo-generate-btn" (click)="generatePhoto()">
+        Generate Photo
+      </button>
     </div>
   </div>
 </div>
