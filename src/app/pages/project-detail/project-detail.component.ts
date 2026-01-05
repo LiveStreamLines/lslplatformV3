@@ -1,9 +1,10 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, AfterViewInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { forkJoin, of } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
+import * as L from 'leaflet';
 import { PROJECT_IMAGE, NO_IMAGE } from '../../constants/figma-assets';
 import { ProjectsService } from '../../services/projects.service';
 import { CamerasService } from '../../services/cameras.service';
@@ -21,7 +22,7 @@ import { API_CONFIG } from '../../config/api.config';
   templateUrl: './project-detail.component.html',
   styleUrl: './project-detail.component.css'
 })
-export class ProjectDetailComponent implements OnInit {
+export class ProjectDetailComponent implements OnInit, AfterViewInit, OnDestroy {
   projectId: string = '';
   project: Project | null = null;
   projectName = 'Loading...';
@@ -44,6 +45,14 @@ export class ProjectDetailComponent implements OnInit {
   quickViewCamera: Camera | null = null;
   isQuickViewOpen = false;
   currentCameraIndex: number = 0;
+
+  @ViewChild('thumbnailMap', { static: false }) thumbnailMapContainer!: ElementRef;
+  @ViewChild('fullMap', { static: false }) fullMapContainer!: ElementRef;
+  private thumbnailMap: L.Map | null = null;
+  private thumbnailMarker: L.Marker | null = null;
+  private fullMap: L.Map | null = null;
+  private fullMapMarker: L.Marker | null = null;
+  isFullMapOpen = false;
 
   constructor(
     private route: ActivatedRoute,
@@ -301,6 +310,17 @@ export class ProjectDetailComponent implements OnInit {
   }
 
   /**
+   * Format coordinate (lat/lng) to string with 6 decimal places
+   */
+  formatCoordinate(coord: number | string | undefined): string {
+    if (coord === undefined || coord === null) return '';
+    const num = typeof coord === 'string' ? parseFloat(coord) : coord;
+    if (isNaN(num)) return '';
+    // Format to 6 decimal places
+    return num.toFixed(6);
+  }
+
+  /**
    * Calculate camera status based on last photo timestamp
    * Online: Last photo is less than 2 hours ago
    * Offline: Last photo is more than 2 hours ago but less than 5 days ago
@@ -351,12 +371,20 @@ export class ProjectDetailComponent implements OnInit {
     this.quickViewCamera = camera;
     this.currentCameraIndex = this.cameras.findIndex(c => c.id === camera.id);
     this.isQuickViewOpen = true;
+    // Initialize map after view is updated
+    setTimeout(() => {
+      this.initThumbnailMap();
+    }, 100);
   }
 
   navigatePreviousCamera() {
     if (this.currentCameraIndex > 0) {
       this.currentCameraIndex--;
       this.quickViewCamera = this.cameras[this.currentCameraIndex];
+      // Update map when camera changes
+      setTimeout(() => {
+        this.updateThumbnailMap();
+      }, 100);
     }
   }
 
@@ -364,6 +392,10 @@ export class ProjectDetailComponent implements OnInit {
     if (this.currentCameraIndex < this.cameras.length - 1) {
       this.currentCameraIndex++;
       this.quickViewCamera = this.cameras[this.currentCameraIndex];
+      // Update map when camera changes
+      setTimeout(() => {
+        this.updateThumbnailMap();
+      }, 100);
     }
   }
 
@@ -425,6 +457,231 @@ export class ProjectDetailComponent implements OnInit {
     if (camera.status !== 'Removed') {
       camera.status = 'Stopped'; // Set status to stopped on image error (unless already Removed)
     }
+  }
+
+  ngAfterViewInit() {
+    // Map will be initialized when quick view opens
+  }
+
+  ngOnDestroy() {
+    // Clean up map when component is destroyed
+    if (this.thumbnailMap) {
+      this.thumbnailMap.remove();
+      this.thumbnailMap = null;
+    }
+  }
+
+  private initThumbnailMap() {
+    if (!this.quickViewCamera || !this.quickViewCamera.lat || !this.quickViewCamera.lng) {
+      return;
+    }
+
+    // Wait for view to update
+    setTimeout(() => {
+      if (!this.thumbnailMapContainer?.nativeElement) {
+        return;
+      }
+
+      const container = this.thumbnailMapContainer.nativeElement;
+      
+      // Check if container has dimensions
+      if (container.offsetWidth === 0 || container.offsetHeight === 0) {
+        setTimeout(() => this.initThumbnailMap(), 100);
+        return;
+      }
+
+      // Fix Leaflet default icon issue
+      this.fixLeafletIcons();
+
+      const lat = typeof this.quickViewCamera!.lat === 'string' 
+        ? parseFloat(this.quickViewCamera!.lat) 
+        : this.quickViewCamera!.lat!;
+      const lng = typeof this.quickViewCamera!.lng === 'string' 
+        ? parseFloat(this.quickViewCamera!.lng) 
+        : this.quickViewCamera!.lng!;
+
+      // Initialize map with lower zoom to show more area
+      this.thumbnailMap = L.map(container, {
+        center: [lat, lng],
+        zoom: 5,
+        zoomControl: false,
+        attributionControl: false,
+        scrollWheelZoom: false,
+        doubleClickZoom: false,
+        dragging: false,
+        touchZoom: false,
+        boxZoom: false,
+        keyboard: false
+      });
+
+      // Add OpenStreetMap tiles
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        crossOrigin: true
+      }).addTo(this.thumbnailMap);
+
+      // Add marker for camera location
+      const markerIcon = L.divIcon({
+        className: 'thumbnail-map-marker',
+        html: `<div style="background: #5621d2; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>`,
+        iconSize: [12, 12],
+        iconAnchor: [6, 6]
+      });
+
+      this.thumbnailMarker = L.marker([lat, lng], { icon: markerIcon })
+        .addTo(this.thumbnailMap);
+
+      // Fit bounds to show marker with some padding
+      this.thumbnailMap.fitBounds([[lat, lng]], { padding: [10, 10] });
+    }, 50);
+  }
+
+  private updateThumbnailMap() {
+    if (!this.quickViewCamera || !this.quickViewCamera.lat || !this.quickViewCamera.lng) {
+      if (this.thumbnailMap) {
+        this.thumbnailMap.remove();
+        this.thumbnailMap = null;
+        this.thumbnailMarker = null;
+      }
+      return;
+    }
+
+    if (!this.thumbnailMap) {
+      this.initThumbnailMap();
+      return;
+    }
+
+    const lat = typeof this.quickViewCamera.lat === 'string' 
+      ? parseFloat(this.quickViewCamera.lat) 
+      : this.quickViewCamera.lat!;
+    const lng = typeof this.quickViewCamera.lng === 'string' 
+      ? parseFloat(this.quickViewCamera.lng) 
+      : this.quickViewCamera.lng!;
+
+    // Update map center with lower zoom
+    this.thumbnailMap.setView([lat, lng], 5);
+
+    // Update or create marker
+    if (this.thumbnailMarker) {
+      this.thumbnailMarker.setLatLng([lat, lng]);
+    } else {
+      const markerIcon = L.divIcon({
+        className: 'thumbnail-map-marker',
+        html: `<div style="background: #5621d2; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>`,
+        iconSize: [12, 12],
+        iconAnchor: [6, 6]
+      });
+      this.thumbnailMarker = L.marker([lat, lng], { icon: markerIcon })
+        .addTo(this.thumbnailMap);
+    }
+
+    // Fit bounds
+    this.thumbnailMap.fitBounds([[lat, lng]], { padding: [10, 10] });
+  }
+
+  openFullMap() {
+    if (!this.quickViewCamera || !this.quickViewCamera.lat || !this.quickViewCamera.lng) {
+      return;
+    }
+    this.isFullMapOpen = true;
+    setTimeout(() => {
+      this.initFullMap();
+    }, 100);
+  }
+
+  closeFullMap(event?: Event) {
+    if (event) {
+      event.stopPropagation();
+    }
+    this.isFullMapOpen = false;
+    if (this.fullMap) {
+      setTimeout(() => {
+        this.fullMap?.remove();
+        this.fullMap = null;
+        this.fullMapMarker = null;
+      }, 300);
+    }
+  }
+
+  private initFullMap() {
+    if (!this.quickViewCamera || !this.quickViewCamera.lat || !this.quickViewCamera.lng) {
+      return;
+    }
+
+    const camera = this.quickViewCamera; // Store reference to avoid null checks
+
+    setTimeout(() => {
+      if (!this.fullMapContainer?.nativeElement) {
+        return;
+      }
+
+      const container = this.fullMapContainer.nativeElement;
+      
+      if (container.offsetWidth === 0 || container.offsetHeight === 0) {
+        setTimeout(() => this.initFullMap(), 100);
+        return;
+      }
+
+      // Fix Leaflet default icon issue
+      this.fixLeafletIcons();
+
+      const lat = typeof camera.lat === 'string' 
+        ? parseFloat(camera.lat) 
+        : camera.lat!;
+      const lng = typeof camera.lng === 'string' 
+        ? parseFloat(camera.lng) 
+        : camera.lng!;
+
+      // Initialize full map
+      this.fullMap = L.map(container, {
+        center: [lat, lng],
+        zoom: 13,
+        zoomControl: true,
+        attributionControl: true
+      });
+
+      // Add OpenStreetMap tiles
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        crossOrigin: true,
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(this.fullMap);
+
+      // Add marker for camera location
+      const markerIcon = L.divIcon({
+        className: 'full-map-marker',
+        html: `<div style="background: #5621d2; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"></div>`,
+        iconSize: [20, 20],
+        iconAnchor: [10, 10]
+      });
+
+      this.fullMapMarker = L.marker([lat, lng], { icon: markerIcon })
+        .addTo(this.fullMap)
+        .bindPopup(`
+          <div class="map-popup">
+            <h3>${camera.name || 'Camera'}</h3>
+            <p>Coordinates: ${lat.toFixed(6)}, ${lng.toFixed(6)}</p>
+          </div>
+        `);
+
+      // Fit bounds to show marker with padding
+      this.fullMap.fitBounds([[lat, lng]], { padding: [50, 50] });
+
+      // Invalidate size to ensure proper rendering
+      setTimeout(() => {
+        this.fullMap?.invalidateSize();
+      }, 100);
+    }, 50);
+  }
+
+  private fixLeafletIcons() {
+    // Fix Leaflet default icon paths
+    delete (L.Icon.Default.prototype as any)._getIconUrl;
+    L.Icon.Default.mergeOptions({
+      iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+      iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+    });
   }
 }
 

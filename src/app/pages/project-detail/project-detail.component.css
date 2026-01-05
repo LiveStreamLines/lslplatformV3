@@ -558,13 +558,13 @@
   position: relative;
   width: 50%;
   height: 100%;
-  padding: 30px;
+  padding: 20px;
   background: radial-gradient(ellipse 53.00% 103.39% at 100.00% -0.00%, var(--primary-color-bg) 0%, #EEF2F6 100%);
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
   align-items: flex-start;
-  gap: 32px;
+  gap: 16px;
   transform: translateX(100%);
   transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15);
@@ -582,7 +582,7 @@
   flex-direction: column;
   justify-content: flex-start;
   align-items: flex-start;
-  gap: 12px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
@@ -590,13 +590,13 @@
   .quick-view-header {
     flex-direction: row;
     align-items: center;
-    gap: 16px;
+    gap: 12px;
   }
 }
 
 @media (min-width: 1000px) {
   .quick-view-header {
-    gap: 32px;
+    gap: 16px;
   }
 }
 
@@ -670,12 +670,12 @@
   flex-direction: column;
   justify-content: flex-start;
   align-items: flex-start;
-  gap: 12px;
+  gap: 8px;
 }
 
 @media (min-width: 768px) {
   .quick-view-content {
-    gap: 16px;
+    gap: 12px;
   }
 }
 
@@ -685,12 +685,12 @@
   flex-direction: column;
   justify-content: flex-start;
   align-items: flex-start;
-  gap: 12px;
+  gap: 8px;
 }
 
 @media (min-width: 768px) {
   .quick-view-camera-header {
-    gap: 17px;
+    gap: 12px;
   }
 }
 
@@ -700,7 +700,7 @@
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 12px;
 }
 
 .camera-header-left {
@@ -867,7 +867,7 @@
   width: 100%;
   height: 100%;
   max-width: 849px;
-  max-height: 540px;
+  max-height: 700px;
   object-fit: cover;
   border-radius: 15.36px;
 }
@@ -875,20 +875,20 @@
 @media (max-width: 768px) {
   .main-image {
     max-width: 100%;
-    max-height: 250px;
+    max-height: 350px;
   }
 }
 
 @media (min-width: 768px) and (max-width: 1200px) {
   .main-image {
     max-width: 100%;
-    max-height: 400px;
+    max-height: 550px;
   }
 }
 
 .thumbnail-overlay {
-  width: 80px;
-  height: 74px;
+  width: 100px;
+  height: 90px;
   position: absolute;
   left: 10px;
   bottom: 10px;
@@ -896,21 +896,75 @@
   border: 2px #ffffff solid;
   overflow: hidden;
   z-index: 2;
+  background: #f5f5f5;
 }
 
 @media (min-width: 1000px) {
   .thumbnail-overlay {
-    width: 100px;
-    height: 93px;
+    width: 120px;
+    height: 110px;
     left: 19px;
     bottom: 20px;
   }
 }
 
-.thumbnail-image {
+.thumbnail-map-container {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+}
+
+/* Leaflet map styling for thumbnail */
+:host ::ng-deep .thumbnail-map-container .leaflet-container {
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  background: #e5e7eb;
+}
+
+:host ::ng-deep .thumbnail-map-container .leaflet-control-container {
+  display: none; /* Hide all controls */
+}
+
+.coordinate-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.7) 0%, rgba(0, 0, 0, 0.4) 70%, transparent 100%);
+  padding: 6px 8px;
+  display: flex;
+  align-items: flex-end;
+  z-index: 3;
+}
+
+.coordinate-label {
+  width: 100%;
+}
+
+.coordinate-text {
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: #ffffff;
+  display: block;
+  text-align: left;
+  word-break: break-all;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+@media (min-width: 1000px) {
+  .coordinate-overlay {
+    padding: 8px 10px;
+  }
+  
+  .coordinate-text {
+    font-size: 11px;
+  }
 }
 
 .navigation-arrows {
@@ -967,10 +1021,155 @@
 }
 
 .nav-arrow-left svg {
-  transform: rotate(-90deg);
+  transform: rotate(0deg);
 }
 
 .nav-arrow-right svg {
-  transform: rotate(90deg);
+  transform: rotate(0deg);
+}
+
+/* Full Map Modal Styles */
+.full-map-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.full-map-backdrop.open {
+  opacity: 1;
+  visibility: visible;
+}
+
+.full-map-modal {
+  background: #ffffff;
+  border-radius: 12px;
+  width: 85%;
+  max-width: 900px;
+  height: 80vh;
+  max-height: 800px;
+  display: flex;
+  flex-direction: column;
+  transform: scale(0.9);
+  transition: transform 0.3s ease;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.full-map-backdrop.open .full-map-modal {
+  transform: scale(1);
+}
+
+.full-map-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.full-map-header h3 {
+  margin: 0;
+  font-family: 'Inter', sans-serif;
+  font-size: 20px;
+  font-weight: 600;
+  color: #121926;
+}
+
+.full-map-close-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.full-map-close-btn:hover {
+  background: #f5f5f5;
+}
+
+.full-map-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  position: relative;
+}
+
+.full-map-container {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  border-radius: 0 0 12px 12px;
+  overflow: hidden;
+}
+
+.full-map-coordinates {
+  padding: 16px 24px;
+  background: #f9fafb;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Inter', sans-serif;
+}
+
+.coordinate-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #4b5565;
+}
+
+.coordinate-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #121926;
+  font-family: 'monospace';
+}
+
+/* Thumbnail map cursor pointer */
+.thumbnail-overlay {
+  cursor: pointer;
+}
+
+/* Full map popup styles */
+:host ::ng-deep .full-map-container .leaflet-popup-content-wrapper {
+  border-radius: 8px;
+  padding: 0;
+}
+
+:host ::ng-deep .full-map-container .leaflet-popup-content {
+  margin: 0;
+  padding: 16px;
+  min-width: 200px;
+}
+
+.map-popup {
+  font-family: 'Inter', sans-serif;
+}
+
+.map-popup h3 {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #121926;
+}
+
+.map-popup p {
+  margin: 4px 0;
+  font-size: 14px;
+  color: #4b5565;
 }
 

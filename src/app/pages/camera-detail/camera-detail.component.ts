@@ -41,6 +41,7 @@ export class CameraDetailComponent implements OnInit {
   images: string[] = [];
   isLoading = false;
   error: string | null = null;
+  isFullscreen = false;
 
   constructor(
     private route: ActivatedRoute,
@@ -125,11 +126,24 @@ export class CameraDetailComponent implements OnInit {
   }
 
   loadTodayImages(developerTag: string, projectTag: string, cameraTag: string) {
-    this.cameraPicsService.getTodayImages(developerTag, projectTag, cameraTag).subscribe({
-      next: (imageUrls) => {
-        if (imageUrls.length > 0) {
-          this.images = imageUrls;
-          this.currentImageIndex = imageUrls.length - 1; // Start with latest
+    // Get timestamps first, then convert to URLs
+    const today = new Date();
+    const todayStr = String(today.getFullYear()) +
+      String(today.getMonth() + 1).padStart(2, '0') +
+      String(today.getDate()).padStart(2, '0');
+
+    const url = `${API_CONFIG.baseUrl}/api/camerapics-s3-test/${developerTag}/${projectTag}/${cameraTag}/pictures/`;
+    
+    this.http.post<any>(url, { date1: todayStr, date2: todayStr }).subscribe({
+      next: (response) => {
+        const allPhotos = [...new Set([...response.date1Photos, ...response.date2Photos])];
+        
+        if (allPhotos.length > 0) {
+          const sortedPhotos = allPhotos.sort((a, b) => b.localeCompare(a));
+          this.images = sortedPhotos.map(timestamp =>
+            this.cameraPicsService.getProxiedImageUrl(developerTag, projectTag, cameraTag, timestamp)
+          );
+          this.currentImageIndex = sortedPhotos.length - 1; // Start with latest
         } else {
           this.loadRecentImages(developerTag, projectTag, cameraTag);
         }
@@ -381,6 +395,37 @@ export class CameraDetailComponent implements OnInit {
   }
 
   fullscreenImage() {
-    // Implement fullscreen functionality
+    if (this.images.length === 0) return;
+    this.isFullscreen = true;
+    // Prevent body scroll when fullscreen is open
+    document.body.style.overflow = 'hidden';
   }
+
+  closeFullscreen() {
+    this.isFullscreen = false;
+    document.body.style.overflow = '';
+  }
+
+  nextImageFullscreen() {
+    if (this.currentImageIndex < this.images.length - 1) {
+      this.currentImageIndex++;
+    }
+  }
+
+  previousImageFullscreen() {
+    if (this.currentImageIndex > 0) {
+      this.currentImageIndex--;
+    }
+  }
+
+  onFullscreenKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape') {
+      this.closeFullscreen();
+    } else if (event.key === 'ArrowRight') {
+      this.nextImageFullscreen();
+    } else if (event.key === 'ArrowLeft') {
+      this.previousImageFullscreen();
+    }
+  }
+
 }

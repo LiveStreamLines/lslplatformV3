@@ -237,8 +237,13 @@
         <div class="quick-view-image-section">
           <div class="main-image-container">
             <img [src]="quickViewCamera.image" [alt]="quickViewCamera.name" class="main-image" />
-            <div class="thumbnail-overlay" *ngIf="quickViewCamera.thumbnail">
-              <img [src]="quickViewCamera.thumbnail" [alt]="quickViewCamera.name" class="thumbnail-image" />
+            <div class="thumbnail-overlay" *ngIf="quickViewCamera.lat && quickViewCamera.lng" (click)="openFullMap()">
+              <div #thumbnailMap class="thumbnail-map-container"></div>
+              <div class="coordinate-overlay">
+                <div class="coordinate-label">
+                  <span class="coordinate-text">{{ formatCoordinate(quickViewCamera.lat) }}, {{ formatCoordinate(quickViewCamera.lng) }}</span>
+                </div>
+              </div>
             </div>
           </div>
           <div class="navigation-arrows">
@@ -254,6 +259,30 @@
             </button>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Full Map Modal -->
+<div 
+  class="full-map-backdrop" 
+  [class.open]="isFullMapOpen"
+  (click)="closeFullMap($event)">
+  <div class="full-map-modal" [class.open]="isFullMapOpen" (click)="$event.stopPropagation()">
+    <div class="full-map-header">
+      <h3 *ngIf="quickViewCamera">{{ quickViewCamera.name }} - Location</h3>
+      <button class="full-map-close-btn" (click)="closeFullMap($event)">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M18 6L6 18M6 6L18 18" stroke="#121926" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </div>
+    <div class="full-map-content">
+      <div #fullMap class="full-map-container"></div>
+      <div class="full-map-coordinates" *ngIf="quickViewCamera?.lat && quickViewCamera?.lng">
+        <span class="coordinate-label">Coordinates:</span>
+        <span class="coordinate-value">{{ formatCoordinate(quickViewCamera?.lat) }}, {{ formatCoordinate(quickViewCamera?.lng) }}</span>
       </div>
     </div>
   </div>

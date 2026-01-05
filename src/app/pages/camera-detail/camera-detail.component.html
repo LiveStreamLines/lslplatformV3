@@ -131,14 +131,15 @@
           <div *ngFor="let image of images; let i = index" 
                class="carousel-image" 
                [class.active]="i === currentImageIndex"
-               [class.prev]="i < currentImageIndex"
-               [class.next]="i > currentImageIndex">
+               [class.prev]="i === currentImageIndex - 1"
+               [class.next]="i === currentImageIndex + 1">
             <img [src]="image" [alt]="'Image ' + (i + 1)" />
           </div>
         </div>
         <button class="fullscreen-btn" (click)="fullscreenImage()">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M2 2H6V6M14 2H10V6M14 14H10V10M2 14H6V10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M5 2H2V5M11 2H14V5M11 14H14V11M5 14H2V11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M2 2L6 6M14 2L10 6M14 14L10 10M2 14L6 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </button>
         <div class="carousel-navigation">
@@ -186,6 +187,44 @@
         </svg>
         <span>Slider</span>
       </button>
+    </div>
+  </div>
+</div>
+
+<!-- Fullscreen Image Modal -->
+<div 
+  class="fullscreen-modal" 
+  *ngIf="isFullscreen && images.length > 0"
+  (click)="closeFullscreen()"
+  (keydown)="onFullscreenKeydown($event)"
+  tabindex="0">
+  <button class="fullscreen-close-btn" (click)="closeFullscreen()">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M18 6L6 18M6 6L18 18" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </button>
+  <div class="fullscreen-image-container" (click)="$event.stopPropagation()">
+    <img [src]="images[currentImageIndex]" [alt]="'Image ' + (currentImageIndex + 1)" class="fullscreen-image" />
+    <div class="fullscreen-nav">
+      <button 
+        class="fullscreen-nav-btn fullscreen-nav-prev" 
+        (click)="previousImageFullscreen()" 
+        [disabled]="currentImageIndex === 0">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <button 
+        class="fullscreen-nav-btn fullscreen-nav-next" 
+        (click)="nextImageFullscreen()" 
+        [disabled]="currentImageIndex === images.length - 1">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M9 18L15 12L9 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </div>
+    <div class="fullscreen-counter">
+      {{ currentImageIndex + 1 }} / {{ images.length }}
     </div>
   </div>
 </div>
