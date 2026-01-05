@@ -393,8 +393,19 @@ export class ProjectDetailComponent implements OnInit {
 
   navigateToCommunity() {
     if (this.project?.developer) {
-      // Navigate to communities page - the overlay will show projects for this developer
-      this.router.navigate(['/communities']);
+      // Navigate to projects page with developer ID to show all projects for this developer
+      this.router.navigate(['/projects'], { 
+        queryParams: { developerId: this.project.developer } 
+      });
+    }
+  }
+
+  navigateToProjects() {
+    if (this.project?.developer) {
+      // Navigate to projects page with developer ID as query parameter
+      this.router.navigate(['/projects'], { 
+        queryParams: { developerId: this.project.developer } 
+      });
     }
   }
 

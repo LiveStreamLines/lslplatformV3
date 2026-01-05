@@ -41,8 +41,8 @@ export class CommunitiesService {
         });
 
         // Map developers to communities with project counts
-        return developers.map(dev => {
-          const community = this.mapDeveloperToCommunity(dev);
+        return developers.map((dev, index) => {
+          const community = this.mapDeveloperToCommunity(dev, index);
           community.projectCount = projectCounts.get(dev._id) || 0;
           return community;
         });
@@ -61,20 +61,24 @@ export class CommunitiesService {
 
   /**
    * Map API Developer response to Community format for UI
+   * @param developer - Developer API response
+   * @param index - Index of the developer in the list (0-based)
    */
-  private mapDeveloperToCommunity(developer: DeveloperApiResponse): Community {
-    // Get image from internalAttachments if available, otherwise use logo
+  private mapDeveloperToCommunity(developer: DeveloperApiResponse, index?: number): Community {
+    // Get image from logo (backend URL) for all cards
+    // For the first card (index 0), prioritize logo over internalAttachments to use backend URL
     let imageUrl = '';
     
-    if (developer.internalAttachments && developer.internalAttachments.length > 0) {
-      // Use the first attachment URL (already a full URL from S3)
-      imageUrl = developer.internalAttachments[0].url;
-    } else if (developer.logo) {
+    // Always use logo (backend URL) if available, regardless of index
+    if (developer.logo) {
       // Logo is a relative path like "logos/developer/xxx.png"
-      // Construct full URL
+      // Construct full backend URL
       imageUrl = developer.logo.startsWith('http') 
         ? developer.logo 
         : `${API_CONFIG.baseUrl}/${developer.logo}`;
+    } else if (developer.internalAttachments && developer.internalAttachments.length > 0) {
+      // Fallback to internalAttachments if no logo (for backward compatibility)
+      imageUrl = developer.internalAttachments[0].url;
     }
 
     return {

@@ -47,22 +47,28 @@ export class ProjectsService {
    * Map API response to Project model
    */
   private mapProjectApiToProject(apiProject: ProjectApiResponse): Project {
-    // Build image URL from logo or internalAttachments
+    // Build image URL from logo (backend URL) - prioritize logo over internalAttachments
     let imageUrl = '';
     if (apiProject.logo) {
-      // If logo is a full URL, use it; otherwise construct the URL
+      // Logo is a relative path like "logos/project/xxx.png"
+      // Construct full backend URL
       if (apiProject.logo.startsWith('http')) {
         imageUrl = apiProject.logo;
       } else {
         imageUrl = `${API_CONFIG.baseUrl}/${apiProject.logo}`;
       }
     } else if (apiProject.internalAttachments && apiProject.internalAttachments.length > 0) {
-      // Use first image attachment if available
+      // Fallback to internalAttachments only if no logo
+      // Only use if it's already a backend URL (not S3)
       const imageAttachment = apiProject.internalAttachments.find(
         att => att.type && att.type.startsWith('image/')
       );
       if (imageAttachment) {
-        imageUrl = imageAttachment.url;
+        // Only use if it's a backend URL, not S3
+        if (imageAttachment.url && imageAttachment.url.startsWith(API_CONFIG.baseUrl)) {
+          imageUrl = imageAttachment.url;
+        }
+        // Skip S3 URLs - we want backend URLs only
       }
     }
 
