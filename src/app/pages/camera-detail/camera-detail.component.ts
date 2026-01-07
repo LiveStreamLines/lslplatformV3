@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, AfterViewChecked, ViewChild, ElementRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, AfterViewChecked, ViewChild, ElementRef, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
@@ -46,6 +46,9 @@ export class CameraDetailComponent implements OnInit, OnDestroy, AfterViewChecke
   isLoading = false;
   loadingProgress = 0; // Loading progress percentage (0-100)
   error: string | null = null;
+  currentProjectTag: string = '';
+  currentDeveloperTag: string = '';
+  currentCameraTag: string = '';
   isFullscreen = false;
 
   // Thumbnail Strip
@@ -77,6 +80,52 @@ export class CameraDetailComponent implements OnInit, OnDestroy, AfterViewChecke
   photoToTime: string = '23:59:59';
   showDateInPhoto: boolean = false;
   showTimeInPhoto: boolean = true;
+
+  // Compare Modal
+  showCompareModal = false;
+  compareMode: 'side-by-side' | 'slider' | 'spot' = 'side-by-side';
+  compareLeftDate: Date = new Date();
+  compareLeftTime: string = '00:00:00';
+  compareRightDate: Date = new Date();
+  compareRightTime: string = '23:59:59';
+  compareLeftImages: string[] = []; // Array of timestamps
+  compareRightImages: string[] = []; // Array of timestamps
+  selectedComparisonImage1: string | null = null;
+  selectedComparisonImage2: string | null = null;
+  loadingCompareLeft: boolean = false;
+  loadingCompareRight: boolean = false;
+  showCompareLeftThumbnailStrip: boolean = false; // Show thumbnail strip for left side
+  showCompareRightThumbnailStrip: boolean = false; // Show thumbnail strip for right side
+  comparisonSliderValue: number = 50; // 0-100, 50 is middle
+  isDraggingComparison: boolean = false;
+  rectangleX: number = 50; // percentage from left
+  rectangleY: number = 50; // percentage from top
+  rectangleSize: number = 183; // size in pixels
+  isDraggingRectangle: boolean = false;
+  rectangleDragStartX: number = 0;
+  rectangleDragStartY: number = 0;
+  rectangleWrapperWidth: number = 1000; // will be updated dynamically
+  rectangleWrapperHeight: number = 600; // will be updated dynamically
+  showCompareLeftDatePicker = false;
+  showCompareLeftTimePicker = false;
+  showCompareRightDatePicker = false;
+  showCompareRightTimePicker = false;
+  tempCompareLeftDate: Date | null = null;
+  tempCompareRightDate: Date | null = null;
+  tempCompareLeftTime: string | null = null;
+  tempCompareRightTime: string | null = null;
+
+  // Studio Modal
+  showStudioModal = false;
+  studioDate: Date = new Date();
+  studioTime: string = '00:00:00';
+  studioImage: string | null = null;
+  studioImageTimestamp: string | null = null;
+  studioTool: 'crop' | 'text' | 'box' | 'circle' | 'arrow' | 'image' | 'effect' | null = null;
+  showStudioDatePicker = false;
+  showStudioTimePicker = false;
+  studioHistory: any[] = []; // For undo/redo functionality
+  studioHistoryIndex: number = -1;
 
   constructor(
     private route: ActivatedRoute,
@@ -140,6 +189,11 @@ export class CameraDetailComponent implements OnInit, OnDestroy, AfterViewChecke
         const projectTag = project.projectTag || '';
         const developerTag = developer.developerTag || '';
         const cameraTag = camera.camera || '';
+
+        // Store tags for use in compare/studio modals
+        this.currentProjectTag = projectTag;
+        this.currentDeveloperTag = developerTag;
+        this.currentCameraTag = cameraTag;
 
         if (developerTag && projectTag && cameraTag) {
           const selectedDateStr = this.formatDateToYYYYMMDD(this.selectedDateObj);
@@ -917,5 +971,820 @@ export class CameraDetailComponent implements OnInit, OnDestroy, AfterViewChecke
   ngOnDestroy() {
     // Remove click outside listener if component is destroyed
     document.removeEventListener('click', this.handleClickOutsideThumbnailStrip);
+    // Remove drag listeners
+    if (this.isDraggingComparison) {
+      this.isDraggingComparison = false;
+    }
+    if (this.isDraggingRectangle) {
+      this.isDraggingRectangle = false;
+    }
+  }
+
+  // ==================== COMPARE MODAL METHODS ====================
+
+  /**
+   * Open compare modal
+   */
+  openCompareModal() {
+    // Initialize with current image timestamp
+    if (this.images.length > 0 && this.imageTimestamps.length > 0) {
+      const currentTimestamp = this.imageTimestamps[this.currentImageIndex];
+      if (currentTimestamp && currentTimestamp.length >= 8) {
+        const year = parseInt(currentTimestamp.substring(0, 4), 10);
+        const month = parseInt(currentTimestamp.substring(4, 6), 10) - 1;
+        const day = parseInt(currentTimestamp.substring(6, 8), 10);
+        const hour = currentTimestamp.length >= 10 ? parseInt(currentTimestamp.substring(8, 10), 10) : 0;
+        const minute = currentTimestamp.length >= 12 ? parseInt(currentTimestamp.substring(10, 12), 10) : 0;
+        const second = currentTimestamp.length >= 14 ? parseInt(currentTimestamp.substring(12, 14), 10) : 0;
+        
+        this.compareLeftDate = new Date(year, month, day);
+        this.compareLeftTime = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:${String(second).padStart(2, '0')}`;
+        
+        this.compareRightDate = new Date(year, month, day);
+        this.compareRightTime = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:${String(second).padStart(2, '0')}`;
+      }
+    }
+    
+    // Reset comparison state
+    this.selectedComparisonImage1 = null;
+    this.selectedComparisonImage2 = null;
+    this.compareLeftImages = [];
+    this.compareRightImages = [];
+    this.comparisonSliderValue = 50;
+    this.rectangleX = 50;
+    this.rectangleY = 50;
+    this.compareMode = 'side-by-side';
+    this.showCompareLeftThumbnailStrip = false;
+    this.showCompareRightThumbnailStrip = false;
+    this.showCompareModal = true;
+    document.body.style.overflow = 'hidden';
+    
+    // Load all images for both dates
+    this.loadCompareImagesForDate('left');
+    this.loadCompareImagesForDate('right');
+  }
+
+  /**
+   * Close compare modal
+   */
+  closeCompareModal(event?: Event) {
+    if (event) {
+      event.stopPropagation();
+    }
+    this.showCompareModal = false;
+    document.body.style.overflow = '';
+    this.isDraggingComparison = false;
+    this.isDraggingRectangle = false;
+  }
+
+  /**
+   * Load all images for a date (for thumbnail selection)
+   */
+  loadCompareImagesForDate(side: 'left' | 'right') {
+    if (!this.camera) return;
+
+    const date = side === 'left' ? this.compareLeftDate : this.compareRightDate;
+    const dateStr = this.formatDateToYYYYMMDD(date);
+
+    if (side === 'left') {
+      this.loadingCompareLeft = true;
+      this.compareLeftImages = [];
+    } else {
+      this.loadingCompareRight = true;
+      this.compareRightImages = [];
+    }
+
+    forkJoin({
+      project: this.projectsService.getProjectById(this.camera.project!),
+      developer: this.http.get<any>(`${API_CONFIG.baseUrl}/api/developers/${this.camera.developer}`)
+    }).subscribe({
+      next: ({ project, developer }) => {
+        const projectTag = project.projectTag || '';
+        const developerTag = developer.developerTag || '';
+        const cameraTag = this.camera!.camera || '';
+
+        // Store tags if not already stored
+        if (!this.currentProjectTag) this.currentProjectTag = projectTag;
+        if (!this.currentDeveloperTag) this.currentDeveloperTag = developerTag;
+        if (!this.currentCameraTag) this.currentCameraTag = cameraTag;
+
+        if (developerTag && projectTag && cameraTag) {
+          const url = `${API_CONFIG.baseUrl}/api/camerapics-s3-test/${developerTag}/${projectTag}/${cameraTag}/pictures/`;
+          
+          // For a single date, use only date1 (as per test component)
+          const requestBody = { date1: dateStr };
+          
+          console.log(`Requesting images for ${side} on date:`, dateStr);
+          console.log(`Request URL:`, url);
+          console.log(`Request body:`, requestBody);
+          
+          this.http.post<any>(url, requestBody).subscribe({
+            next: (response) => {
+              console.log(`API response for ${side} on ${dateStr}:`, response);
+              
+              // For single date query, images are in date1Photos
+              const date1Photos = response.date1Photos || [];
+              const date2Photos = response.date2Photos || [];
+              // Combine both arrays in case date2 was also provided
+              const allPhotos = [...new Set([...date1Photos, ...date2Photos])];
+              
+              console.log(`date1Photos length:`, date1Photos.length);
+              console.log(`date2Photos length:`, date2Photos.length);
+              console.log(`Total unique photos for ${side}:`, allPhotos.length);
+              
+              if (side === 'left') {
+                this.compareLeftImages = allPhotos.sort((a, b) => a.localeCompare(b));
+                this.loadingCompareLeft = false;
+                console.log(`Final left images array length:`, this.compareLeftImages.length);
+                
+                // Select first image by default, or closest to selected time
+                if (this.compareLeftImages.length > 0) {
+                  this.selectCompareImageByTime('left');
+                } else {
+                  // If no images, clear selection and show message
+                  this.selectedComparisonImage1 = null;
+                  console.warn(`No images found for date ${dateStr}. First photo: ${response.firstPhoto}, Last photo: ${response.lastPhoto}`);
+                }
+              } else {
+                this.compareRightImages = allPhotos.sort((a, b) => a.localeCompare(b));
+                this.loadingCompareRight = false;
+                console.log(`Final right images array length:`, this.compareRightImages.length);
+                
+                // Select first image by default, or closest to selected time
+                if (this.compareRightImages.length > 0) {
+                  this.selectCompareImageByTime('right');
+                } else {
+                  // If no images, clear selection and show message
+                  this.selectedComparisonImage2 = null;
+                  console.warn(`No images found for date ${dateStr}. First photo: ${response.firstPhoto}, Last photo: ${response.lastPhoto}`);
+                }
+              }
+            },
+            error: (err) => {
+              console.error(`Error loading compare images for ${side}:`, err);
+              if (side === 'left') {
+                this.loadingCompareLeft = false;
+                this.compareLeftImages = [];
+                this.selectedComparisonImage1 = null;
+              } else {
+                this.loadingCompareRight = false;
+                this.compareRightImages = [];
+                this.selectedComparisonImage2 = null;
+              }
+            }
+          });
+        }
+      },
+      error: (err) => {
+        console.error('Error loading project or developer for compare:', err);
+        if (side === 'left') {
+          this.loadingCompareLeft = false;
+        } else {
+          this.loadingCompareRight = false;
+        }
+      }
+    });
+  }
+
+  /**
+   * Select comparison image by timestamp (from thumbnail)
+   */
+  selectComparisonImage1(timestamp: string): void {
+    this.selectedComparisonImage1 = timestamp;
+    // Hide thumbnail strip when image is selected
+    this.showCompareLeftThumbnailStrip = false;
+    // Update time to match selected image
+    if (timestamp.length >= 14) {
+      const hour = parseInt(timestamp.substring(8, 10), 10);
+      const minute = parseInt(timestamp.substring(10, 12), 10);
+      const second = parseInt(timestamp.substring(12, 14), 10);
+      this.compareLeftTime = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:${String(second).padStart(2, '0')}`;
+    }
+  }
+
+  /**
+   * Select comparison image 2
+   */
+  selectComparisonImage2(timestamp: string): void {
+    this.selectedComparisonImage2 = timestamp;
+    // Hide thumbnail strip when image is selected
+    this.showCompareRightThumbnailStrip = false;
+    // Update time to match selected image
+    if (timestamp.length >= 14) {
+      const hour = parseInt(timestamp.substring(8, 10), 10);
+      const minute = parseInt(timestamp.substring(10, 12), 10);
+      const second = parseInt(timestamp.substring(12, 14), 10);
+      this.compareRightTime = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:${String(second).padStart(2, '0')}`;
+    }
+  }
+
+  /**
+   * Select compare image closest to selected time
+   */
+  selectCompareImageByTime(side: 'left' | 'right') {
+    const images = side === 'left' ? this.compareLeftImages : this.compareRightImages;
+    const time = side === 'left' ? this.compareLeftTime : this.compareRightTime;
+    const date = side === 'left' ? this.compareLeftDate : this.compareRightDate;
+    
+    if (images.length === 0) return;
+
+    const dateStr = this.formatDateToYYYYMMDD(date);
+    const timeParts = time.split(':');
+    const targetHour = parseInt(timeParts[0] || '0', 10);
+    const targetMinute = parseInt(timeParts[1] || '0', 10);
+    const targetSecond = parseInt(timeParts[2] || '0', 10);
+    const targetTimestamp = `${dateStr}${String(targetHour).padStart(2, '0')}${String(targetMinute).padStart(2, '0')}${String(targetSecond).padStart(2, '0')}`;
+
+    // Find closest timestamp
+    let closestTimestamp = images[0];
+    let minDiff = Math.abs(parseInt(targetTimestamp) - parseInt(closestTimestamp));
+
+    for (const timestamp of images) {
+      const diff = Math.abs(parseInt(targetTimestamp) - parseInt(timestamp));
+      if (diff < minDiff) {
+        minDiff = diff;
+        closestTimestamp = timestamp;
+      }
+    }
+
+    // Select the closest image
+    if (side === 'left') {
+      this.selectComparisonImage1(closestTimestamp);
+    } else {
+      this.selectComparisonImage2(closestTimestamp);
+    }
+  }
+
+  /**
+   * Get image URL for a timestamp (for thumbnail display)
+   */
+  getCompareImageUrl(timestamp: string): string {
+    if (!timestamp) return '';
+    // Use stored tags if available, otherwise try to get from camera
+    const projectTag = this.currentProjectTag || this.camera?.projectTag || '';
+    const developerTag = this.currentDeveloperTag || this.camera?.developerTag || '';
+    const cameraTag = this.currentCameraTag || this.camera?.camera || '';
+    
+    if (!developerTag || !projectTag || !cameraTag) {
+      console.warn('Missing tags for image URL:', { developerTag, projectTag, cameraTag });
+      return '';
+    }
+    
+    return this.cameraPicsService.getProxiedImageUrl(developerTag, projectTag, cameraTag, timestamp);
+  }
+
+  /**
+   * Format timestamp for display
+   */
+  formatTimestamp(timestamp: string): string {
+    if (timestamp.length === 14) {
+      const year = timestamp.slice(0, 4);
+      const month = timestamp.slice(4, 6);
+      const day = timestamp.slice(6, 8);
+      const hour = timestamp.slice(8, 10);
+      const minute = timestamp.slice(10, 12);
+      const second = timestamp.slice(12, 14);
+      return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+    }
+    return timestamp;
+  }
+
+  /**
+   * Get comparison clip path for slider mode
+   */
+  getComparisonClipPath(): string {
+    const percentage = this.comparisonSliderValue;
+    return `inset(0 ${100 - percentage}% 0 0)`;
+  }
+
+  /**
+   * Get rectangle clip path for spot mode
+   */
+  getRectangleClipPath(): string {
+    if (this.rectangleWrapperWidth === 0 || this.rectangleWrapperHeight === 0) {
+      this.rectangleWrapperWidth = 1000;
+      this.rectangleWrapperHeight = 600;
+    }
+    
+    const x = this.rectangleX;
+    const y = this.rectangleY;
+    
+    const halfWidthPercent = (this.rectangleSize / this.rectangleWrapperWidth) * 50;
+    const halfHeightPercent = (this.rectangleSize / this.rectangleWrapperHeight) * 50;
+    
+    const top = Math.max(0, y - halfHeightPercent);
+    const right = Math.max(0, 100 - x - halfWidthPercent);
+    const bottom = Math.max(0, 100 - y - halfHeightPercent);
+    const left = Math.max(0, x - halfWidthPercent);
+    
+    return `inset(${top}% ${right}% ${bottom}% ${left}%)`;
+  }
+
+  /**
+   * Handle comparison slider drag start
+   */
+  onComparisonDragStart(event: MouseEvent): void {
+    const wrapper = (event.currentTarget as HTMLElement);
+    const rect = wrapper.getBoundingClientRect();
+    
+    const x = event.clientX - rect.left;
+    const percentage = (x / rect.width) * 100;
+    this.comparisonSliderValue = Math.max(0, Math.min(100, percentage));
+    this.isDraggingComparison = true;
+    
+    const mouseMoveListener = (moveEvent: MouseEvent) => {
+      if (this.isDraggingComparison) {
+        const x = moveEvent.clientX - rect.left;
+        const percentage = (x / rect.width) * 100;
+        this.comparisonSliderValue = Math.max(0, Math.min(100, percentage));
+      }
+    };
+
+    const mouseUpListener = () => {
+      this.isDraggingComparison = false;
+      window.removeEventListener('mousemove', mouseMoveListener);
+      window.removeEventListener('mouseup', mouseUpListener);
+    };
+
+    window.addEventListener('mousemove', mouseMoveListener);
+    window.addEventListener('mouseup', mouseUpListener);
+    
+    event.preventDefault();
+  }
+
+  /**
+   * Handle rectangle drag start for spot mode
+   */
+  onRectangleDragStart(event: MouseEvent): void {
+    event.stopPropagation();
+    const rectangle = (event.currentTarget as HTMLElement);
+    const wrapper = rectangle.closest('.comparison-image-wrapper') as HTMLElement;
+    if (!wrapper) return;
+
+    const wrapperRect = wrapper.getBoundingClientRect();
+    const rect = rectangle.getBoundingClientRect();
+    
+    this.rectangleWrapperWidth = wrapperRect.width;
+    this.rectangleWrapperHeight = wrapperRect.height;
+    
+    this.rectangleDragStartX = event.clientX - (rect.left + rect.width / 2);
+    this.rectangleDragStartY = event.clientY - (rect.top + rect.height / 2);
+    this.isDraggingRectangle = true;
+
+    const mouseMoveListener = (moveEvent: MouseEvent) => {
+      if (this.isDraggingRectangle) {
+        const newX = moveEvent.clientX - wrapperRect.left - this.rectangleDragStartX;
+        const newY = moveEvent.clientY - wrapperRect.top - this.rectangleDragStartY;
+        
+        const xPercent = (newX / wrapperRect.width) * 100;
+        const yPercent = (newY / wrapperRect.height) * 100;
+        
+        const halfWidthPercent = (this.rectangleSize / wrapperRect.width) * 50;
+        const halfHeightPercent = (this.rectangleSize / wrapperRect.height) * 50;
+        
+        this.rectangleX = Math.max(halfWidthPercent, Math.min(100 - halfWidthPercent, xPercent));
+        this.rectangleY = Math.max(halfHeightPercent, Math.min(100 - halfHeightPercent, yPercent));
+        
+        this.rectangleWrapperWidth = wrapperRect.width;
+        this.rectangleWrapperHeight = wrapperRect.height;
+      }
+    };
+
+    const mouseUpListener = () => {
+      this.isDraggingRectangle = false;
+      window.removeEventListener('mousemove', mouseMoveListener);
+      window.removeEventListener('mouseup', mouseUpListener);
+    };
+
+    window.addEventListener('mousemove', mouseMoveListener);
+    window.addEventListener('mouseup', mouseUpListener);
+    
+    event.preventDefault();
+  }
+
+  /**
+   * Format date for compare display (DD-MMM-YYYY)
+   */
+  formatDateForCompare(date: Date): string {
+    const day = String(date.getDate()).padStart(2, '0');
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = months[date.getMonth()];
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
+  }
+
+  /**
+   * Format time for compare display (HH:MM:SS)
+   */
+  formatTimeForCompare(time: string): string {
+    return time;
+  }
+
+  /**
+   * Handle compare date change (when calendar date is selected)
+   */
+  onCompareDateChange(side: 'left' | 'right', event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (input.value) {
+      const dateParts = input.value.split('-');
+      const newDate = new Date(
+        parseInt(dateParts[0], 10),
+        parseInt(dateParts[1], 10) - 1,
+        parseInt(dateParts[2], 10)
+      );
+      
+      console.log(`Date changed for ${side}:`, input.value, '->', newDate);
+      
+      // Apply immediately when date is selected
+      if (side === 'left') {
+        this.compareLeftDate = newDate;
+        this.showCompareLeftDatePicker = false;
+        this.selectedComparisonImage1 = null;
+        this.tempCompareLeftDate = null;
+        // Clear existing images before loading new ones
+        this.compareLeftImages = [];
+        // Show thumbnail strip when left date is selected
+        this.showCompareLeftThumbnailStrip = true;
+        this.loadCompareImagesForDate('left');
+      } else {
+        this.compareRightDate = newDate;
+        this.showCompareRightDatePicker = false;
+        this.selectedComparisonImage2 = null;
+        this.tempCompareRightDate = null;
+        // Clear existing images before loading new ones
+        this.compareRightImages = [];
+        // Show thumbnail strip when right date is selected
+        this.showCompareRightThumbnailStrip = true;
+        this.loadCompareImagesForDate('right');
+      }
+    }
+  }
+
+  /**
+   * Handle compare time change (when input value changes)
+   */
+  onCompareTimeChange(side: 'left' | 'right', event: Event) {
+    const input = event.target as HTMLInputElement;
+    const time = input.value ? input.value + ':00' : (side === 'left' ? this.compareLeftTime : this.compareRightTime);
+    
+    // Store temporarily until Apply is clicked
+    if (side === 'left') {
+      this.tempCompareLeftTime = time;
+    } else {
+      this.tempCompareRightTime = time;
+    }
+  }
+
+  /**
+   * Apply compare time change
+   */
+  applyCompareTimeChange(side: 'left' | 'right') {
+    if (side === 'left' && this.tempCompareLeftTime !== null) {
+      this.compareLeftTime = this.tempCompareLeftTime;
+      this.showCompareLeftTimePicker = false;
+      this.tempCompareLeftTime = null;
+      // Find and select the closest image to the selected time
+      this.selectCompareImageByTime('left');
+    } else if (side === 'right' && this.tempCompareRightTime !== null) {
+      this.compareRightTime = this.tempCompareRightTime;
+      this.showCompareRightTimePicker = false;
+      this.tempCompareRightTime = null;
+      // Find and select the closest image to the selected time
+      this.selectCompareImageByTime('right');
+    } else {
+      // If no temp time, just close
+      if (side === 'left') {
+        this.showCompareLeftTimePicker = false;
+        this.tempCompareLeftTime = null;
+      } else {
+        this.showCompareRightTimePicker = false;
+        this.tempCompareRightTime = null;
+      }
+    }
+  }
+
+  /**
+   * Cancel compare time change
+   */
+  cancelCompareTimeChange(side: 'left' | 'right') {
+    if (side === 'left') {
+      this.showCompareLeftTimePicker = false;
+      this.tempCompareLeftTime = null;
+    } else {
+      this.showCompareRightTimePicker = false;
+      this.tempCompareRightTime = null;
+    }
+  }
+
+  /**
+   * Toggle compare date picker (inline calendar)
+   */
+  toggleCompareDatePicker(side: 'left' | 'right', event: Event) {
+    event.stopPropagation();
+    
+    // Close the other picker if open
+    if (side === 'left') {
+      this.showCompareRightDatePicker = false;
+      this.showCompareLeftDatePicker = !this.showCompareLeftDatePicker;
+      if (this.showCompareLeftDatePicker) {
+        this.tempCompareLeftDate = new Date(this.compareLeftDate);
+      }
+    } else {
+      this.showCompareLeftDatePicker = false;
+      this.showCompareRightDatePicker = !this.showCompareRightDatePicker;
+      if (this.showCompareRightDatePicker) {
+        this.tempCompareRightDate = new Date(this.compareRightDate);
+      }
+    }
+  }
+
+  /**
+   * Toggle compare time picker (inline time input)
+   */
+  toggleCompareTimePicker(side: 'left' | 'right', event: Event) {
+    event.stopPropagation();
+    
+    // Close the other picker if open
+    if (side === 'left') {
+      this.showCompareRightTimePicker = false;
+      this.showCompareLeftTimePicker = !this.showCompareLeftTimePicker;
+      if (this.showCompareLeftTimePicker) {
+        this.tempCompareLeftTime = this.compareLeftTime;
+      }
+    } else {
+      this.showCompareLeftTimePicker = false;
+      this.showCompareRightTimePicker = !this.showCompareRightTimePicker;
+      if (this.showCompareRightTimePicker) {
+        this.tempCompareRightTime = this.compareRightTime;
+      }
+    }
+  }
+
+  /**
+   * Get date input value for compare date picker
+   */
+  getCompareDateInputValue(side: 'left' | 'right'): string {
+    const date = side === 'left' ? this.compareLeftDate : this.compareRightDate;
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  // ==================== STUDIO MODAL METHODS ====================
+
+  /**
+   * Open studio modal
+   */
+  openStudioModal() {
+    // Initialize with current image timestamp
+    if (this.images.length > 0 && this.imageTimestamps.length > 0) {
+      const currentTimestamp = this.imageTimestamps[this.currentImageIndex];
+      if (currentTimestamp && currentTimestamp.length >= 8) {
+        const year = parseInt(currentTimestamp.substring(0, 4), 10);
+        const month = parseInt(currentTimestamp.substring(4, 6), 10) - 1;
+        const day = parseInt(currentTimestamp.substring(6, 8), 10);
+        const hour = currentTimestamp.length >= 10 ? parseInt(currentTimestamp.substring(8, 10), 10) : 0;
+        const minute = currentTimestamp.length >= 12 ? parseInt(currentTimestamp.substring(10, 12), 10) : 0;
+        const second = currentTimestamp.length >= 14 ? parseInt(currentTimestamp.substring(12, 14), 10) : 0;
+        
+        this.studioDate = new Date(year, month, day);
+        this.studioTime = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:${String(second).padStart(2, '0')}`;
+        this.studioImageTimestamp = currentTimestamp;
+      }
+    }
+    
+    // Load current image
+    if (this.images.length > 0) {
+      this.studioImage = this.images[this.currentImageIndex];
+    }
+    
+    this.studioTool = null;
+    this.showStudioModal = true;
+    document.body.style.overflow = 'hidden';
+  }
+
+  /**
+   * Close studio modal
+   */
+  closeStudioModal(event?: Event) {
+    if (event) {
+      event.stopPropagation();
+    }
+    this.showStudioModal = false;
+    document.body.style.overflow = '';
+  }
+
+  /**
+   * Handle studio date change
+   */
+  onStudioDateChange(event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (input.value) {
+      const dateParts = input.value.split('-');
+      const newDate = new Date(
+        parseInt(dateParts[0], 10),
+        parseInt(dateParts[1], 10) - 1,
+        parseInt(dateParts[2], 10)
+      );
+      this.studioDate = newDate;
+      this.showStudioDatePicker = false;
+      this.loadStudioImage();
+    }
+  }
+
+  /**
+   * Handle studio time change
+   */
+  onStudioTimeChange(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const time = input.value ? input.value + ':00' : this.studioTime;
+    this.studioTime = time;
+    this.showStudioTimePicker = false;
+    this.loadStudioImage();
+  }
+
+  /**
+   * Load studio image based on selected date/time
+   */
+  loadStudioImage() {
+    if (!this.camera) return;
+
+    const dateStr = this.formatDateToYYYYMMDD(this.studioDate);
+    const timeParts = this.studioTime.split(':');
+    const targetHour = parseInt(timeParts[0] || '0', 10);
+    const targetMinute = parseInt(timeParts[1] || '0', 10);
+    const targetSecond = parseInt(timeParts[2] || '0', 10);
+    const targetTimestamp = `${dateStr}${String(targetHour).padStart(2, '0')}${String(targetMinute).padStart(2, '0')}${String(targetSecond).padStart(2, '0')}`;
+
+    forkJoin({
+      project: this.projectsService.getProjectById(this.camera.project!),
+      developer: this.http.get<any>(`${API_CONFIG.baseUrl}/api/developers/${this.camera.developer}`)
+    }).subscribe({
+      next: ({ project, developer }) => {
+        const projectTag = project.projectTag || '';
+        const developerTag = developer.developerTag || '';
+        const cameraTag = this.camera!.camera || '';
+
+        if (developerTag && projectTag && cameraTag) {
+          const url = `${API_CONFIG.baseUrl}/api/camerapics-s3-test/${developerTag}/${projectTag}/${cameraTag}/pictures/`;
+          
+          this.http.post<any>(url, { date1: dateStr, date2: dateStr }).subscribe({
+            next: (response) => {
+              const allPhotos = [...new Set([...response.date1Photos, ...response.date2Photos])];
+              
+              if (allPhotos.length > 0) {
+                // Find closest timestamp to target
+                let closestTimestamp = allPhotos[0];
+                let minDiff = Math.abs(parseInt(targetTimestamp) - parseInt(closestTimestamp));
+                
+                for (const timestamp of allPhotos) {
+                  const diff = Math.abs(parseInt(targetTimestamp) - parseInt(timestamp));
+                  if (diff < minDiff) {
+                    minDiff = diff;
+                    closestTimestamp = timestamp;
+                  }
+                }
+                
+                // Load the closest image
+                const imageUrl = this.cameraPicsService.getProxiedImageUrl(developerTag, projectTag, cameraTag, closestTimestamp);
+                this.studioImage = imageUrl;
+                this.studioImageTimestamp = closestTimestamp;
+              }
+            },
+            error: (err) => {
+              console.error('Error loading studio image:', err);
+            }
+          });
+        }
+      },
+      error: (err) => {
+        console.error('Error loading project or developer for studio:', err);
+      }
+    });
+  }
+
+  /**
+   * Get studio date input value
+   */
+  getStudioDateInputValue(): string {
+    const year = this.studioDate.getFullYear();
+    const month = String(this.studioDate.getMonth() + 1).padStart(2, '0');
+    const day = String(this.studioDate.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  /**
+   * Set studio tool
+   */
+  setStudioTool(tool: 'crop' | 'text' | 'box' | 'circle' | 'arrow' | 'image' | 'effect' | null) {
+    this.studioTool = tool;
+  }
+
+  /**
+   * Clear all studio edits
+   */
+  clearStudioAll() {
+    this.studioTool = null;
+    this.studioHistory = [];
+    this.studioHistoryIndex = -1;
+    // Add logic to clear all edits when implemented
+  }
+
+  /**
+   * Undo studio action
+   */
+  undoStudioAction() {
+    if (this.studioHistoryIndex > 0) {
+      this.studioHistoryIndex--;
+      // Apply the previous state
+      // This will be implemented when editing functionality is added
+    }
+  }
+
+  /**
+   * Redo studio action
+   */
+  redoStudioAction() {
+    if (this.studioHistoryIndex < this.studioHistory.length - 1) {
+      this.studioHistoryIndex++;
+      // Apply the next state
+      // This will be implemented when editing functionality is added
+    }
+  }
+
+  /**
+   * Share studio image
+   */
+  shareStudioImage() {
+    // Add share functionality when implemented
+    console.log('Share studio image');
+  }
+
+  /**
+   * Download studio image
+   */
+  downloadStudioImage() {
+    if (this.studioImage) {
+      const link = document.createElement('a');
+      link.href = this.studioImage;
+      link.download = `studio-image-${this.studioImageTimestamp || Date.now()}.jpg`;
+      link.click();
+    }
+  }
+
+  /**
+   * Toggle compare left thumbnail strip
+   */
+  toggleCompareLeftThumbnailStrip(event: Event) {
+    event.stopPropagation();
+    this.showCompareLeftThumbnailStrip = !this.showCompareLeftThumbnailStrip;
+  }
+
+  /**
+   * Close compare left thumbnail strip
+   */
+  closeCompareLeftThumbnailStrip() {
+    this.showCompareLeftThumbnailStrip = false;
+  }
+
+  /**
+   * Toggle compare right thumbnail strip
+   */
+  toggleCompareRightThumbnailStrip(event: Event) {
+    event.stopPropagation();
+    this.showCompareRightThumbnailStrip = !this.showCompareRightThumbnailStrip;
+  }
+
+  /**
+   * Close compare right thumbnail strip
+   */
+  closeCompareRightThumbnailStrip() {
+    this.showCompareRightThumbnailStrip = false;
+  }
+
+  /**
+   * Close date/time pickers and thumbnail strip when clicking outside
+   */
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent) {
+    // Close date/time pickers if clicking outside
+    const target = event.target as HTMLElement;
+    if (!target.closest('.compare-date-picker-part') && 
+        !target.closest('.compare-time-picker-part') &&
+        !target.closest('.compare-calendar-dropdown') &&
+        !target.closest('.compare-time-dropdown')) {
+      this.showCompareLeftDatePicker = false;
+      this.showCompareRightDatePicker = false;
+      this.showCompareLeftTimePicker = false;
+      this.showCompareRightTimePicker = false;
+    }
+    
+    // Close thumbnail strips if clicking outside
+    if (!target.closest('.compare-slider-btn') && 
+        !target.closest('.compare-thumbnail-strip')) {
+      this.showCompareLeftThumbnailStrip = false;
+      this.showCompareRightThumbnailStrip = false;
+    }
   }
 }

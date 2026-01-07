@@ -35,13 +35,13 @@
       </div>
     </div>
     <div class="action-buttons">
-      <button class="action-btn">
+      <button class="action-btn" (click)="openCompareModal()">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M4 8H12M8 4V12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
         </svg>
         <span>Compare</span>
       </button>
-      <button class="action-btn">
+      <button class="action-btn" (click)="openStudioModal()">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M8 2L10 6L14 7L10 8L8 12L6 8L2 7L6 6L8 2Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
@@ -600,3 +600,572 @@
     </div>
   </div>
 </div>
+
+<!-- Compare Modal -->
+<div class="compare-modal" *ngIf="showCompareModal" (click)="closeCompareModal($event)">
+  <div class="compare-modal-content" (click)="$event.stopPropagation()">
+    <!-- Close Button -->
+    <button class="compare-modal-close-btn" (click)="closeCompareModal($event)">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M18 6L6 18M6 6L18 18" stroke="#CF1D17" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+
+    <!-- Modal Header -->
+    <div class="compare-modal-header">
+      <h3 class="compare-modal-title">Compare</h3>
+      <!-- Tab Bar -->
+      <div class="compare-tab-bar">
+        <button class="compare-tab" [class.active]="compareMode === 'side-by-side'" (click)="compareMode = 'side-by-side'">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="2" y="3" width="5" height="10" rx="1" stroke="currentColor" stroke-width="1.5"/>
+            <rect x="9" y="3" width="5" height="10" rx="1" stroke="currentColor" stroke-width="1.5"/>
+          </svg>
+          <span>Side by Side</span>
+        </button>
+        <button class="compare-tab" [class.active]="compareMode === 'slider'" (click)="compareMode = 'slider'">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M8 2V14M2 8H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <span>Slider</span>
+        </button>
+        <button class="compare-tab" [class.active]="compareMode === 'spot'" (click)="compareMode = 'spot'">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/>
+          </svg>
+          <span>Spot</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Compare Content -->
+    <div class="compare-content">
+      <!-- Side by Side Mode -->
+      <div class="compare-side-by-side" *ngIf="compareMode === 'side-by-side'">
+        <div class="compare-image-panel">
+          <div class="compare-image-container">
+            <img *ngIf="selectedComparisonImage1" 
+                 [src]="getCompareImageUrl(selectedComparisonImage1)" 
+                 [alt]="selectedComparisonImage1"
+                 class="compare-image" />
+            <div *ngIf="!selectedComparisonImage1 && !loadingCompareLeft" class="compare-loading">
+              <p>Loading image...</p>
+            </div>
+            <div *ngIf="loadingCompareLeft" class="compare-loading">
+              <p>Loading images...</p>
+            </div>
+          </div>
+          <div class="compare-date-picker-wrapper">
+            <div class="compare-date-time-picker">
+              <div class="compare-date-picker-part" (click)="toggleCompareDatePicker('left', $event)">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="2" y="3" width="12" height="11" rx="2" stroke="#4b5565" stroke-width="1.5"/>
+                  <path d="M5 1V4M11 1V4M2 7H14" stroke="#4b5565" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+                <span>{{ formatDateForCompare(compareLeftDate) }}</span>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M4 6L8 10L12 6" stroke="#5621d2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <!-- Inline Calendar for Left -->
+              <div class="compare-calendar-dropdown" *ngIf="showCompareLeftDatePicker" (click)="$event.stopPropagation()">
+                <input 
+                  type="date" 
+                  [value]="getCompareDateInputValue('left')" 
+                  (change)="onCompareDateChange('left', $event)"
+                  class="compare-calendar-input"
+                />
+              </div>
+            </div>
+            <button class="compare-slider-btn" (click)="toggleCompareLeftThumbnailStrip($event)" [class.active]="showCompareLeftThumbnailStrip">
+              <span>Slider</span>
+            </button>
+          </div>
+          <!-- Thumbnail Strip for Left Image -->
+          <div class="compare-thumbnail-strip" *ngIf="showCompareLeftThumbnailStrip" (click)="$event.stopPropagation()">
+            <button class="thumbnail-close-btn" (click)="closeCompareLeftThumbnailStrip()" title="Close thumbnail strip">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 4L4 12M4 4L12 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <div class="thumbnail-strip-container" *ngIf="!loadingCompareLeft && compareLeftImages.length > 0">
+              <div class="thumbnail-strip">
+                <div *ngFor="let timestamp of compareLeftImages" 
+                     class="thumbnail-item"
+                     [class.selected]="selectedComparisonImage1 === timestamp"
+                     (click)="selectComparisonImage1(timestamp)"
+                     [title]="formatTimestampToTime(timestamp)">
+                  <img [src]="getCompareImageUrl(timestamp)" 
+                       [alt]="timestamp"
+                       class="thumbnail-image" />
+                  <div class="thumbnail-time-badge" *ngIf="selectedComparisonImage1 === timestamp">
+                    {{ formatTimestampToTime(timestamp) }}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div *ngIf="loadingCompareLeft" class="thumbnail-strip-loading">
+              <p>Loading images...</p>
+            </div>
+            <div *ngIf="!loadingCompareLeft && compareLeftImages.length === 0" class="thumbnail-strip-empty">
+              <p>No images found for this date</p>
+            </div>
+          </div>
+          <div *ngIf="loadingCompareLeft" class="compare-thumbnail-loading">
+            <p>Loading images...</p>
+          </div>
+          <div *ngIf="!loadingCompareLeft && compareLeftImages.length === 0" class="compare-thumbnail-empty">
+            <p>No images found for this date</p>
+          </div>
+        </div>
+        <div class="compare-image-panel">
+          <div class="compare-image-container">
+            <img *ngIf="selectedComparisonImage2" 
+                 [src]="getCompareImageUrl(selectedComparisonImage2)" 
+                 [alt]="selectedComparisonImage2"
+                 class="compare-image" />
+            <div *ngIf="!selectedComparisonImage2 && !loadingCompareRight" class="compare-loading">
+              <p>Loading image...</p>
+            </div>
+            <div *ngIf="loadingCompareRight" class="compare-loading">
+              <p>Loading images...</p>
+            </div>
+          </div>
+          <div class="compare-date-picker-wrapper">
+            <div class="compare-date-time-picker">
+              <div class="compare-date-picker-part" (click)="toggleCompareDatePicker('right', $event)">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="2" y="3" width="12" height="11" rx="2" stroke="#4b5565" stroke-width="1.5"/>
+                  <path d="M5 1V4M11 1V4M2 7H14" stroke="#4b5565" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+                <span>{{ formatDateForCompare(compareRightDate) }}</span>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M4 6L8 10L12 6" stroke="#5621d2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <!-- Inline Calendar for Right -->
+              <div class="compare-calendar-dropdown" *ngIf="showCompareRightDatePicker" (click)="$event.stopPropagation()">
+                <input 
+                  type="date" 
+                  [value]="getCompareDateInputValue('right')" 
+                  (change)="onCompareDateChange('right', $event)"
+                  class="compare-calendar-input"
+                />
+              </div>
+            </div>
+            <button class="compare-slider-btn" (click)="toggleCompareRightThumbnailStrip($event)" [class.active]="showCompareRightThumbnailStrip">
+              <span>Slider</span>
+            </button>
+          </div>
+          <!-- Thumbnail Strip for Right Image -->
+          <div class="compare-thumbnail-strip" *ngIf="showCompareRightThumbnailStrip" (click)="$event.stopPropagation()">
+            <button class="thumbnail-close-btn" (click)="closeCompareRightThumbnailStrip()" title="Close thumbnail strip">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 4L4 12M4 4L12 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <div class="thumbnail-strip-container" *ngIf="!loadingCompareRight && compareRightImages.length > 0">
+              <div class="thumbnail-strip">
+                <div *ngFor="let timestamp of compareRightImages" 
+                     class="thumbnail-item"
+                     [class.selected]="selectedComparisonImage2 === timestamp"
+                     (click)="selectComparisonImage2(timestamp)"
+                     [title]="formatTimestampToTime(timestamp)">
+                  <img [src]="getCompareImageUrl(timestamp)" 
+                       [alt]="timestamp"
+                       class="thumbnail-image" />
+                  <div class="thumbnail-time-badge" *ngIf="selectedComparisonImage2 === timestamp">
+                    {{ formatTimestampToTime(timestamp) }}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div *ngIf="loadingCompareRight" class="thumbnail-strip-loading">
+              <p>Loading images...</p>
+            </div>
+            <div *ngIf="!loadingCompareRight && compareRightImages.length === 0" class="thumbnail-strip-empty">
+              <p>No images found for this date</p>
+            </div>
+          </div>
+          <div *ngIf="loadingCompareRight" class="compare-thumbnail-loading">
+            <p>Loading images...</p>
+          </div>
+          <div *ngIf="!loadingCompareRight && compareRightImages.length === 0" class="compare-thumbnail-empty">
+            <p>No images found for this date</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Slider Mode -->
+      <div *ngIf="compareMode === 'slider'" class="comparison-image-wrapper" (mousedown)="onComparisonDragStart($event)">
+        <!-- Image 2 (top layer, will be clipped) -->
+        <div class="comparison-image-container image2-container" [style.clip-path]="getComparisonClipPath()">
+          <img *ngIf="selectedComparisonImage2" 
+               [src]="getCompareImageUrl(selectedComparisonImage2)" 
+               [alt]="selectedComparisonImage2"
+               class="comparison-image" />
+          <div *ngIf="!selectedComparisonImage2 && !loadingCompareRight" class="comparison-loading">
+            <p>Select an image from thumbnails</p>
+          </div>
+          <div *ngIf="loadingCompareRight" class="comparison-loading">
+            <p>Loading images...</p>
+          </div>
+        </div>
+
+        <!-- Image 1 (bottom layer) -->
+        <div class="comparison-image-container image1-container">
+          <img *ngIf="selectedComparisonImage1" 
+               [src]="getCompareImageUrl(selectedComparisonImage1)" 
+               [alt]="selectedComparisonImage1"
+               class="comparison-image" />
+          <div *ngIf="!selectedComparisonImage1 && !loadingCompareLeft" class="comparison-loading">
+            <p>Select an image from thumbnails</p>
+          </div>
+          <div *ngIf="loadingCompareLeft" class="comparison-loading">
+            <p>Loading images...</p>
+          </div>
+        </div>
+
+        <!-- Slider Line Indicator -->
+        <div class="comparison-slider-line" [style.left.%]="comparisonSliderValue">
+          <div class="comparison-slider-handle">
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M16 8L20 16L16 24M12 8L8 16L12 24" stroke="#5621d2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- Spot Mode -->
+      <div *ngIf="compareMode === 'spot'" class="comparison-image-wrapper rectangle-mode">
+        <!-- Image 1 (base layer) -->
+        <div class="comparison-image-container image1-container">
+          <img *ngIf="selectedComparisonImage1" 
+               [src]="getCompareImageUrl(selectedComparisonImage1)" 
+               [alt]="selectedComparisonImage1"
+               class="comparison-image" />
+          <div *ngIf="!selectedComparisonImage1 && !loadingCompareLeft" class="comparison-loading">
+            <p>Select an image from thumbnails</p>
+          </div>
+          <div *ngIf="loadingCompareLeft" class="comparison-loading">
+            <p>Loading images...</p>
+          </div>
+        </div>
+
+        <!-- Image 2 (full size, will be clipped to rectangle) -->
+        <div class="comparison-image-container image2-container rectangle-image2" [style.clip-path]="getRectangleClipPath()">
+          <img *ngIf="selectedComparisonImage2" 
+               [src]="getCompareImageUrl(selectedComparisonImage2)" 
+               [alt]="selectedComparisonImage2"
+               class="comparison-image" />
+          <div *ngIf="!selectedComparisonImage2 && !loadingCompareRight" class="comparison-loading">
+            <p>Select an image from thumbnails</p>
+          </div>
+          <div *ngIf="loadingCompareRight" class="comparison-loading">
+            <p>Loading images...</p>
+          </div>
+        </div>
+
+        <!-- Rectangle Border/Handle -->
+        <div class="rectangle-overlay" 
+             [style.left.%]="rectangleX"
+             [style.top.%]="rectangleY"
+             [style.width.px]="rectangleSize"
+             [style.height.px]="rectangleSize"
+             (mousedown)="onRectangleDragStart($event)">
+          <div class="rectangle-border"></div>
+        </div>
+      </div>
+
+      <!-- Date/Time Pickers for Slider and Spot modes -->
+      <div class="compare-controls-bottom" *ngIf="compareMode === 'slider' || compareMode === 'spot'">
+        <div class="compare-date-time-picker">
+          <div class="compare-date-picker-part" (click)="toggleCompareDatePicker('left', $event)">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="2" y="3" width="12" height="11" rx="2" stroke="#4b5565" stroke-width="1.5"/>
+              <path d="M5 1V4M11 1V4M2 7H14" stroke="#4b5565" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <span>{{ formatDateForCompare(compareLeftDate) }}</span>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M4 6L8 10L12 6" stroke="#5621d2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <!-- Inline Calendar for Left (Slider/Spot) -->
+          <div class="compare-calendar-dropdown" *ngIf="showCompareLeftDatePicker" (click)="$event.stopPropagation()">
+            <input 
+              type="date" 
+              [value]="getCompareDateInputValue('left')" 
+              (change)="onCompareDateChange('left', $event)"
+              class="compare-calendar-input"
+            />
+          </div>
+          <div class="compare-time-picker-part" (click)="toggleCompareTimePicker('left', $event)">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="8" cy="8" r="6" stroke="#4b5565" stroke-width="1.5"/>
+              <path d="M8 4V8L10 10" stroke="#4b5565" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <span>{{ formatTimeForCompare(compareLeftTime) }}</span>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M4 6L8 10L12 6" stroke="#5621d2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <!-- Inline Time Picker for Left (Slider/Spot) -->
+          <div class="compare-time-dropdown" *ngIf="showCompareLeftTimePicker" (click)="$event.stopPropagation()">
+            <input 
+              type="time" 
+              [value]="compareLeftTime.substring(0, 5)" 
+              (change)="onCompareTimeChange('left', $event)"
+              class="compare-time-input"
+              step="1"
+            />
+          </div>
+        </div>
+        <div class="compare-date-time-picker">
+          <div class="compare-date-picker-part" (click)="toggleCompareDatePicker('right', $event)">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="2" y="3" width="12" height="11" rx="2" stroke="#4b5565" stroke-width="1.5"/>
+                <path d="M5 1V4M11 1V4M2 7H14" stroke="#4b5565" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+              <span>{{ formatDateForCompare(compareRightDate) }}</span>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M4 6L8 10L12 6" stroke="#5621d2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <!-- Inline Calendar for Right -->
+            <div class="compare-calendar-dropdown" *ngIf="showCompareRightDatePicker" (click)="$event.stopPropagation()">
+              <input 
+                type="date" 
+                [value]="getCompareDateInputValue('right')" 
+                (change)="onCompareDateChange('right', $event)"
+                class="compare-calendar-input"
+              />
+            </div>
+          <div class="compare-time-picker-part" (click)="toggleCompareTimePicker('right', $event)">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="8" cy="8" r="6" stroke="#4b5565" stroke-width="1.5"/>
+                <path d="M8 4V8L10 10" stroke="#4b5565" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+              <span>{{ formatTimeForCompare(compareRightTime) }}</span>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M4 6L8 10L12 6" stroke="#5621d2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <!-- Inline Time Picker for Right -->
+            <div class="compare-time-dropdown" *ngIf="showCompareRightTimePicker" (click)="$event.stopPropagation()">
+              <input 
+                type="time" 
+                [value]="compareRightTime.substring(0, 5)" 
+                (change)="onCompareTimeChange('right', $event)"
+                class="compare-time-input"
+                step="1"
+              />
+            </div>
+          </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Compare Date/Time Pickers - Now using inline calendars, modals removed -->
+
+<!-- Studio Modal -->
+<div class="studio-modal" *ngIf="showStudioModal" (click)="closeStudioModal($event)">
+  <div class="studio-modal-content" (click)="$event.stopPropagation()">
+    <!-- Close Button -->
+    <button class="studio-modal-close-btn" (click)="closeStudioModal($event)">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M18 6L6 18M6 6L18 18" stroke="#CF1D17" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+
+    <!-- Modal Header -->
+    <div class="studio-modal-header">
+      <div class="studio-header-left">
+        <h3 class="studio-modal-title">Studio</h3>
+        <div class="studio-date-time-picker">
+          <div class="studio-date-picker-part" (click)="showStudioDatePicker = true">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="2" y="3" width="12" height="11" rx="2" stroke="#4b5565" stroke-width="1.5"/>
+              <path d="M5 1V4M11 1V4M2 7H14" stroke="#4b5565" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <span>{{ formatDateForCompare(studioDate) }}</span>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M4 6L8 10L12 6" stroke="#5621d2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="studio-time-picker-part" (click)="showStudioTimePicker = true">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="8" cy="8" r="6" stroke="#4b5565" stroke-width="1.5"/>
+              <path d="M8 4V8L10 10" stroke="#4b5565" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <span>{{ formatTimeForCompare(studioTime) }}</span>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M4 6L8 10L12 6" stroke="#5621d2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+      <div class="studio-header-right">
+        <button class="studio-tool-btn" (click)="undoStudioAction()" title="Undo">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M3 8H13M8 3L3 8L8 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <button class="studio-tool-btn" (click)="redoStudioAction()" title="Redo">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M13 8H3M8 3L13 8L8 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <button class="studio-tool-btn clear-all-btn" (click)="clearStudioAll()">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M2 4H14M12 4V13C12 13.5304 11.7893 14.0391 11.4142 14.4142C11.0391 14.7893 10.5304 15 10 15H6C5.46957 15 4.96086 14.7893 4.58579 14.4142C4.21071 14.0391 4 13.5304 4 13V4M6 4V3C6 2.46957 6.21071 1.96086 6.58579 1.58579C6.96086 1.21071 7.46957 1 8 1C8.53043 1 9.03914 1.21071 9.41421 1.58579C9.78929 1.96086 10 2.46957 10 3V4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>Clear All</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Studio Content -->
+    <div class="studio-content">
+      <!-- Toolbar -->
+      <div class="studio-toolbar">
+        <button class="studio-tool-item" [class.active]="studioTool === 'crop'" (click)="setStudioTool('crop')">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="2" y="2" width="24" height="24" rx="2" stroke="currentColor" stroke-width="1.5"/>
+          </svg>
+          <span>Crop</span>
+        </button>
+        <button class="studio-tool-item" [class.active]="studioTool === 'text'" (click)="setStudioTool('text')">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M7 7H21M7 14H21M7 21H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <span>Text</span>
+        </button>
+        <button class="studio-tool-item" [class.active]="studioTool === 'box'" (click)="setStudioTool('box')">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="4" y="4" width="20" height="20" rx="2" stroke="currentColor" stroke-width="1.5"/>
+          </svg>
+          <span>Box</span>
+        </button>
+        <button class="studio-tool-item" [class.active]="studioTool === 'circle'" (click)="setStudioTool('circle')">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="14" cy="14" r="10" stroke="currentColor" stroke-width="1.5"/>
+          </svg>
+          <span>Circle</span>
+        </button>
+        <button class="studio-tool-item" [class.active]="studioTool === 'arrow'" (click)="setStudioTool('arrow')">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M8 14L14 8L20 14M14 8V20" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>Arrow</span>
+        </button>
+        <button class="studio-tool-item" [class.active]="studioTool === 'image'" (click)="setStudioTool('image')">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="4" y="6" width="20" height="16" rx="2" stroke="currentColor" stroke-width="1.5"/>
+            <circle cx="10" cy="12" r="2" fill="currentColor"/>
+            <path d="M4 18L8 14L14 20L20 14L24 18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>Image</span>
+        </button>
+        <button class="studio-tool-item" [class.active]="studioTool === 'effect'" (click)="setStudioTool('effect')">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M14 4V24M4 14H24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <span>Effect</span>
+        </button>
+      </div>
+
+      <!-- Canvas and Properties -->
+      <div class="studio-main-area">
+        <!-- Canvas -->
+        <div class="studio-canvas">
+          <img *ngIf="studioImage" 
+               [src]="studioImage" 
+               [alt]="'Studio image'"
+               class="studio-canvas-image" />
+          <div *ngIf="!studioImage" class="studio-loading">
+            <p>Loading image...</p>
+          </div>
+        </div>
+
+        <!-- Properties Panel -->
+        <div class="studio-properties">
+          <div class="studio-properties-header">
+            <h4>Properties</h4>
+          </div>
+          <div class="studio-properties-content">
+            <!-- Properties will be shown here based on selected tool -->
+            <p *ngIf="!studioTool" class="studio-properties-empty">Select a tool to edit</p>
+            <div *ngIf="studioTool" class="studio-properties-tool">
+              <p>Tool: {{ studioTool }}</p>
+              <!-- Tool-specific properties will be added here -->
+            </div>
+          </div>
+          <div class="studio-actions">
+            <button class="studio-action-btn share-btn" (click)="shareStudioImage()">
+              Share
+            </button>
+            <button class="studio-action-btn download-btn" (click)="downloadStudioImage()">
+              Download
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Studio Date/Time Picker Modals -->
+<!-- Studio Date Picker -->
+<div class="date-picker-modal" *ngIf="showStudioDatePicker" (click)="showStudioDatePicker = false">
+  <div class="date-picker-modal-content" (click)="$event.stopPropagation()">
+    <div class="date-picker-modal-header">
+      <h3>Select Date</h3>
+      <button class="modal-close-btn" (click)="showStudioDatePicker = false">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M15 5L5 15M5 5L15 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+    <div class="date-picker-modal-body">
+      <input 
+        type="date" 
+        [value]="getStudioDateInputValue()" 
+        (change)="onStudioDateChange($event)"
+        class="date-input-modal"
+      />
+    </div>
+    <div class="date-picker-modal-footer">
+      <button class="modal-btn modal-btn-cancel" (click)="showStudioDatePicker = false">Cancel</button>
+      <button class="modal-btn modal-btn-apply" (click)="showStudioDatePicker = false">Apply</button>
+    </div>
+  </div>
+</div>
+
+<!-- Studio Time Picker -->
+<div class="date-picker-modal" *ngIf="showStudioTimePicker" (click)="showStudioTimePicker = false">
+  <div class="date-picker-modal-content" (click)="$event.stopPropagation()">
+    <div class="date-picker-modal-header">
+      <h3>Select Time</h3>
+      <button class="modal-close-btn" (click)="showStudioTimePicker = false">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M15 5L5 15M5 5L15 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+    <div class="date-picker-modal-body">
+      <input 
+        type="time" 
+        [value]="studioTime.substring(0, 5)" 
+        (change)="onStudioTimeChange($event)"
+        class="date-input-modal"
+        step="1"
+      />
+    </div>
+    <div class="date-picker-modal-footer">
+      <button class="modal-btn modal-btn-cancel" (click)="showStudioTimePicker = false">Cancel</button>
+      <button class="modal-btn modal-btn-apply" (click)="showStudioTimePicker = false">Apply</button>
+    </div>
+  </div>
+</div>
+
