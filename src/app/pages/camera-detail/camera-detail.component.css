@@ -817,7 +817,63 @@
   gap: 16px;
   align-items: center;
   justify-content: center;
-  padding-bottom: 32px;
+  padding: 24px 0;
+  width: 100%;
+}
+
+/* Main Date Picker Wrapper (matches compare mode) */
+.main-date-picker-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+}
+
+.main-date-time-picker {
+  position: relative;
+  display: inline-block;
+}
+
+.main-date-picker-part {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #ffffff;
+  border: 1px solid #cfbaff;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  color: #697586;
+  transition: all 0.2s;
+  min-width: 180px;
+  justify-content: space-between;
+}
+
+.main-date-picker-part:hover {
+  background: #f5f7fa;
+  border-color: #5621d2;
+}
+
+.main-date-picker-part svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.main-date-picker-part svg:first-of-type {
+  color: #4b5565;
+}
+
+.main-date-picker-part svg:last-of-type {
+  color: #5621d2;
+}
+
+.main-date-picker-part span {
+  flex: 1;
+  text-align: left;
 }
 
 .date-time-controls {
@@ -942,7 +998,9 @@
 
 .new-date-picker-wrapper {
   position: relative;
-  display: inline-block;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .new-date-picker-button {
@@ -987,6 +1045,69 @@
 
 .new-date-picker-button:hover span {
   color: #00b330;
+}
+
+/* Main Calendar Dropdown (matches compare mode) */
+.main-calendar-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 10000;
+  background: #ffffff;
+  border: 1px solid #cfbaff;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 12px;
+  min-width: 250px;
+  display: block !important;
+}
+
+.main-calendar-input {
+  width: 100%;
+  padding: 8px;
+  background: #ffffff;
+  border: 1px solid #cfbaff;
+  border-radius: 8px;
+  color: #202939;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.main-calendar-input:focus {
+  outline: none;
+  border-color: #5621d2;
+}
+
+/* Main Slider Button (matches compare mode) */
+.main-slider-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 8px 16px;
+  background: #ffffff;
+  border: 1px solid #cfbaff;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: #697586;
+  font-family: 'Inter', sans-serif;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.main-slider-btn:hover {
+  background: #f5f7fa;
+  border-color: #5621d2;
+}
+
+.main-slider-btn.active {
+  background: #5621d2;
+  border-color: #5621d2;
+  color: #ffffff;
 }
 
 .new-date-input {
@@ -1861,6 +1982,22 @@
 .thumbnail-strip-container::after {
   right: 0;
   background: linear-gradient(to left, #ffffff, transparent);
+}
+
+.thumbnail-strip-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.thumbnail-strip-loading,
+.thumbnail-strip-empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: #697586;
+  font-size: 14px;
+  width: 100%;
 }
 
 .thumbnail-strip {

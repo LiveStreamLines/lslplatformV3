@@ -37,6 +37,7 @@ export class CameraDetailComponent implements OnInit, OnDestroy, AfterViewChecke
   selectedTime = '';
   selectedDateObj: Date = new Date();
   showDatePickerModal = false;
+  showMainDatePicker = false;
   humidity = '50%';
   temperature = '24°C';
   currentImageIndex = 0;
@@ -591,6 +592,34 @@ export class CameraDetailComponent implements OnInit, OnDestroy, AfterViewChecke
     }
   }
 
+  toggleMainDatePicker(event: Event): void {
+    event.stopPropagation();
+    this.showMainDatePicker = !this.showMainDatePicker;
+  }
+
+  onMainDateChange(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (input.value) {
+      // Parse YYYY-MM-DD format
+      const dateParts = input.value.split('-');
+      this.selectedDateObj = new Date(
+        parseInt(dateParts[0], 10),
+        parseInt(dateParts[1], 10) - 1,
+        parseInt(dateParts[2], 10)
+      );
+      this.updateDateDisplay();
+      this.showMainDatePicker = false;
+      
+      // Show thumbnail strip when date is selected
+      this.showThumbnailStrip = true;
+      
+      // Reload images for the selected date
+      if (this.camera) {
+        this.loadImagesForSelectedDate(this.camera);
+      }
+    }
+  }
+
   previousImage() {
     if (this.currentImageIndex > 0) {
       this.currentImageIndex--;
@@ -683,6 +712,32 @@ export class CameraDetailComponent implements OnInit, OnDestroy, AfterViewChecke
     const minute = timestamp.substring(10, 12);
     const second = timestamp.substring(12, 14);
     return `${hour}:${minute}:${second}`;
+  }
+
+  getCurrentImageTime(): string {
+    if (this.imageTimestamps && this.imageTimestamps.length > 0 && 
+        this.currentImageIndex >= 0 && 
+        this.currentImageIndex < this.imageTimestamps.length) {
+      const timestamp = this.imageTimestamps[this.currentImageIndex];
+      if (timestamp) {
+        return this.formatTimestampToTime(timestamp);
+      }
+    }
+    return 'Slider';
+  }
+
+  getCompareLeftImageTime(): string {
+    if (this.selectedComparisonImage1) {
+      return this.formatTimestampToTime(this.selectedComparisonImage1);
+    }
+    return 'Slider';
+  }
+
+  getCompareRightImageTime(): string {
+    if (this.selectedComparisonImage2) {
+      return this.formatTimestampToTime(this.selectedComparisonImage2);
+    }
+    return 'Slider';
   }
 
   /**
@@ -814,7 +869,10 @@ export class CameraDetailComponent implements OnInit, OnDestroy, AfterViewChecke
   /**
    * Toggle thumbnail strip visibility
    */
-  toggleThumbnailStrip() {
+  toggleThumbnailStrip(event?: Event): void {
+    if (event) {
+      event.stopPropagation();
+    }
     this.showThumbnailStrip = !this.showThumbnailStrip;
     if (this.showThumbnailStrip) {
       // Calculate max scroll when strip is shown
@@ -1254,6 +1312,11 @@ export class CameraDetailComponent implements OnInit, OnDestroy, AfterViewChecke
    */
   getComparisonClipPath(): string {
     const percentage = this.comparisonSliderValue;
+    // Clip from right: when slider moves left, show more of left image (image1)
+    // When slider is at 0% (left), clip 100% from right (show all of image1 - left image)
+    // When slider is at 100% (right), clip 0% from right (show all of image2 - right image)
+    // Moving slider left → percentage decreases → clip amount increases → more of left image shows
+    // Moving slider right → percentage increases → clip amount decreases → more of right image shows
     return `inset(0 ${100 - percentage}% 0 0)`;
   }
 
@@ -1780,11 +1843,24 @@ export class CameraDetailComponent implements OnInit, OnDestroy, AfterViewChecke
       this.showCompareRightTimePicker = false;
     }
     
+    // Close main date picker if clicking outside
+    if (!target.closest('.new-date-picker-button') && 
+        !target.closest('.main-calendar-dropdown')) {
+      this.showMainDatePicker = false;
+    }
+    
     // Close thumbnail strips if clicking outside
     if (!target.closest('.compare-slider-btn') && 
         !target.closest('.compare-thumbnail-strip')) {
       this.showCompareLeftThumbnailStrip = false;
       this.showCompareRightThumbnailStrip = false;
+    }
+    
+    // Close main thumbnail strip if clicking outside
+    if (!target.closest('.main-slider-btn') && 
+        !target.closest('.thumbnail-strip-container') &&
+        !target.closest('.new-date-picker-wrapper')) {
+      // Keep strip open if clicking on date picker area, but close if clicking elsewhere
     }
   }
 }
