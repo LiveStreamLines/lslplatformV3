@@ -1,10 +1,14 @@
 <div class="projects-page">
   <div class="page-header">
-    <div class="breadcrumb">
-      <img *ngIf="communityImage" [src]="communityImage" [alt]="selectedCategory" class="breadcrumb-logo clickable" (click)="navigateToAllProjects()" />
-      <img *ngIf="!communityImage" src="assets/images/lsl.svg" alt="Clients" class="breadcrumb-logo clickable" (click)="navigateToAllProjects()" />
-      <span class="breadcrumb-separator">|</span>
-      <span class="breadcrumb-item active">{{ selectedCategory }}</span>
+    <div class="breadcrumb-section">
+      <div class="breadcrumb">
+        <img *ngIf="communityImage" [src]="communityImage" [alt]="selectedCategory" class="breadcrumb-logo clickable" (click)="navigateToAllProjects()" />
+        <img *ngIf="!communityImage" src="assets/images/lsl.svg" alt="Clients" class="breadcrumb-logo clickable" (click)="navigateToAllProjects()" />
+        <svg class="breadcrumb-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M4.5 3L7.5 6L4.5 9" stroke="#9aa4b2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="breadcrumb-item active">{{ selectedCategory }}</span>
+      </div>
     </div>
     <div class="view-toggle">
       <button 
@@ -22,167 +26,171 @@
     </div>
   </div>
 
-  <!-- Loading State -->
-  <div *ngIf="isLoading && viewMode === 'list'" class="loading-state">
-    <p>Loading projects...</p>
-  </div>
+  <!-- List View -->
+  <div *ngIf="isListView()" class="content-scrollable">
+    <!-- Loading State -->
+    <div *ngIf="isLoading" class="loading-state">
+      <p>Loading projects...</p>
+    </div>
 
-  <!-- Error State -->
-  <div *ngIf="error && !isLoading && viewMode === 'list'" class="error-state">
-    <p>{{ error }}</p>
-  </div>
+    <!-- Error State -->
+    <div *ngIf="error && !isLoading" class="error-state">
+      <p>{{ error }}</p>
+    </div>
 
-  <!-- Empty State -->
-  <div *ngIf="!isLoading && !error && projects.length === 0 && viewMode === 'list'" class="empty-state">
-    <p>No projects found for this developer.</p>
-  </div>
+    <!-- Empty State -->
+    <div *ngIf="!isLoading && !error && projects.length === 0" class="empty-state">
+      <p>No projects found for this developer.</p>
+    </div>
 
-  <div class="projects-grid" *ngIf="!isLoading && !error && viewMode === 'list'">
-    <div 
-      *ngFor="let project of projects" 
-      class="project-card"
-      [class.has-active-feature]="project.timeLapsActive"
-      (click)="navigateToProject(project.id)"
-      [attr.role]="'link'"
-      [attr.tabindex]="0"
-      (keydown.enter)="navigateToProject(project.id)"
-      (keydown.space)="navigateToProject(project.id); $event.preventDefault()">
-      <div class="card-header">
-        <h3 class="project-name">{{ project.name }}</h3>
-      </div>
-      
-      <div class="card-image-container">
-        <img [src]="project.image" [alt]="project.name" class="project-image" />
-        <span class="status-badge" [class.status-in-progress]="project.status?.toLowerCase() === 'in progress'" [class.status-completed]="project.status?.toLowerCase() === 'completed'">{{ project.status?.toLowerCase() === 'in progress' ? 'Active' : (project.status?.toLowerCase() === 'completed' ? 'Completed' : project.status) }}</span>
-        <div class="card-progress">
-          <div class="progress-info">
-            <span class="progress-text">{{ project.daysCompleted || 0 }} Days Completed</span>
-          </div>
-          <div class="progress-bar-container">
-            <div class="progress-bar">
-              <div 
-                class="progress-fill"
-                [style.width.%]="getProgressPercentage(project.daysCompleted || 0, project.totalDays || 1095)">
-              </div>
+    <div class="projects-grid" *ngIf="!isLoading && !error">
+      <div 
+        *ngFor="let project of projects" 
+        class="project-card"
+        [class.has-active-feature]="project.timeLapsActive"
+        (click)="navigateToProject(project.id)"
+        [attr.role]="'link'"
+        [attr.tabindex]="0"
+        (keydown.enter)="navigateToProject(project.id)"
+        (keydown.space)="navigateToProject(project.id); $event.preventDefault()">
+        <div class="card-header">
+          <h3 class="project-name">{{ project.name }}</h3>
+        </div>
+        
+        <div class="card-image-container">
+          <img [src]="project.image" [alt]="project.name" class="project-image" />
+          <span class="status-badge" [class.status-in-progress]="project.status?.toLowerCase() === 'in progress'" [class.status-completed]="project.status?.toLowerCase() === 'completed'">{{ project.status?.toLowerCase() === 'in progress' ? 'Active' : (project.status?.toLowerCase() === 'completed' ? 'Completed' : project.status) }}</span>
+          <div class="card-progress">
+            <div class="progress-info">
+              <span class="progress-text">{{ project.daysCompleted || 0 }} Days Completed</span>
             </div>
-            <div class="progress-labels">
-              <span>0</span>
-              <span>{{ project.totalDays || 1095 }}</span>
+            <div class="progress-bar-container">
+              <div class="progress-bar">
+                <div 
+                  class="progress-fill"
+                  [style.width.%]="getProgressPercentage(project.daysCompleted || 0, project.totalDays || 1095)">
+                </div>
+              </div>
+              <div class="progress-labels">
+                <span>0</span>
+                <span>{{ project.totalDays || 1095 }}</span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div class="card-actions" (click)="$event.stopPropagation()">
-        <!-- Time Lapse -->
-        <button 
-          class="action-btn" 
-          [class.active]="getServiceStatus(project.id, 'timelapse')" 
-          title="Time laps" 
-          (click)="$event.stopPropagation()"
-          (mouseenter)="onServiceHover(project.id, 'timelapse', $event)"
-          (mouseleave)="onServiceLeave()">
-          <img [src]="icons.timelapse.disable" alt="Time laps" class="action-icon-img timelapse-icon" />
-          <div 
-            class="service-tooltip" 
-            *ngIf="isServiceHovered(project.id, 'timelapse') && getServiceStatus(project.id, 'timelapse')"
-            [ngStyle]="getTooltipStyleForService(project.id, 'timelapse')">
-            <div class="tooltip-arrow"></div>
-            <div class="tooltip-content">
-              <span class="tooltip-text">{{ getServiceName('timelapse') }}</span>
-              <span class="tooltip-badge">ACTIVE</span>
+        <div class="card-actions" (click)="$event.stopPropagation()">
+          <!-- Time Lapse -->
+          <button 
+            class="action-btn" 
+            [class.active]="getServiceStatus(project.id, 'timelapse')" 
+            title="Time laps" 
+            (click)="$event.stopPropagation()"
+            (mouseenter)="onServiceHover(project.id, 'timelapse', $event)"
+            (mouseleave)="onServiceLeave()">
+            <img [src]="icons.timelapse.disable" alt="Time laps" class="action-icon-img timelapse-icon" />
+            <div 
+              class="service-tooltip" 
+              *ngIf="isServiceHovered(project.id, 'timelapse') && getServiceStatus(project.id, 'timelapse')"
+              [ngStyle]="getTooltipStyleForService(project.id, 'timelapse')">
+              <div class="tooltip-arrow"></div>
+              <div class="tooltip-content">
+                <span class="tooltip-text">{{ getServiceName('timelapse') }}</span>
+                <span class="tooltip-badge">ACTIVE</span>
+              </div>
             </div>
-          </div>
-        </button>
-        
-        <!-- Live -->
-        <button 
-          class="action-btn" 
-          [class.active]="getServiceStatus(project.id, 'live')" 
-          title="Live" 
-          (click)="$event.stopPropagation()"
-          (mouseenter)="onServiceHover(project.id, 'live', $event)"
-          (mouseleave)="onServiceLeave()">
-          <img [src]="icons.live.disable" alt="Live" class="action-icon-img live-icon" />
-          <div 
-            class="service-tooltip" 
-            *ngIf="isServiceHovered(project.id, 'live') && getServiceStatus(project.id, 'live')"
-            [ngStyle]="getTooltipStyleForService(project.id, 'live')">
-            <div class="tooltip-arrow"></div>
-            <div class="tooltip-content">
-              <span class="tooltip-text">{{ getServiceName('live') }}</span>
-              <span class="tooltip-badge">ACTIVE</span>
+          </button>
+          
+          <!-- Live -->
+          <button 
+            class="action-btn" 
+            [class.active]="getServiceStatus(project.id, 'live')" 
+            title="Live" 
+            (click)="$event.stopPropagation()"
+            (mouseenter)="onServiceHover(project.id, 'live', $event)"
+            (mouseleave)="onServiceLeave()">
+            <img [src]="icons.live.disable" alt="Live" class="action-icon-img live-icon" />
+            <div 
+              class="service-tooltip" 
+              *ngIf="isServiceHovered(project.id, 'live') && getServiceStatus(project.id, 'live')"
+              [ngStyle]="getTooltipStyleForService(project.id, 'live')">
+              <div class="tooltip-arrow"></div>
+              <div class="tooltip-content">
+                <span class="tooltip-text">{{ getServiceName('live') }}</span>
+                <span class="tooltip-badge">ACTIVE</span>
+              </div>
             </div>
-          </div>
-        </button>
-        
-        <!-- Drone -->
-        <button 
-          class="action-btn" 
-          [class.active]="getServiceStatus(project.id, 'drone')" 
-          title="Drone" 
-          (click)="$event.stopPropagation()"
-          (mouseenter)="onServiceHover(project.id, 'drone', $event)"
-          (mouseleave)="onServiceLeave()">
-          <img [src]="icons.drone.disable" alt="Drone" class="action-icon-img" />
-          <div 
-            class="service-tooltip" 
-            *ngIf="isServiceHovered(project.id, 'drone') && getServiceStatus(project.id, 'drone')"
-            [ngStyle]="getTooltipStyleForService(project.id, 'drone')">
-            <div class="tooltip-arrow"></div>
-            <div class="tooltip-content">
-              <span class="tooltip-text">{{ getServiceName('drone') }}</span>
-              <span class="tooltip-badge">ACTIVE</span>
+          </button>
+          
+          <!-- Drone -->
+          <button 
+            class="action-btn" 
+            [class.active]="getServiceStatus(project.id, 'drone')" 
+            title="Drone" 
+            (click)="$event.stopPropagation()"
+            (mouseenter)="onServiceHover(project.id, 'drone', $event)"
+            (mouseleave)="onServiceLeave()">
+            <img [src]="icons.drone.disable" alt="Drone" class="action-icon-img" />
+            <div 
+              class="service-tooltip" 
+              *ngIf="isServiceHovered(project.id, 'drone') && getServiceStatus(project.id, 'drone')"
+              [ngStyle]="getTooltipStyleForService(project.id, 'drone')">
+              <div class="tooltip-arrow"></div>
+              <div class="tooltip-content">
+                <span class="tooltip-text">{{ getServiceName('drone') }}</span>
+                <span class="tooltip-badge">ACTIVE</span>
+              </div>
             </div>
-          </div>
-        </button>
-        
-        <!-- Satellite -->
-        <button 
-          class="action-btn" 
-          [class.active]="getServiceStatus(project.id, 'satellite')" 
-          title="Satellite" 
-          (click)="$event.stopPropagation()"
-          (mouseenter)="onServiceHover(project.id, 'satellite', $event)"
-          (mouseleave)="onServiceLeave()">
-          <img [src]="icons.satellite.disable" alt="Satellite" class="action-icon-img" />
-          <div 
-            class="service-tooltip" 
-            *ngIf="isServiceHovered(project.id, 'satellite') && getServiceStatus(project.id, 'satellite')"
-            [ngStyle]="getTooltipStyleForService(project.id, 'satellite')">
-            <div class="tooltip-arrow"></div>
-            <div class="tooltip-content">
-              <span class="tooltip-text">{{ getServiceName('satellite') }}</span>
-              <span class="tooltip-badge">ACTIVE</span>
+          </button>
+          
+          <!-- Satellite -->
+          <button 
+            class="action-btn" 
+            [class.active]="getServiceStatus(project.id, 'satellite')" 
+            title="Satellite" 
+            (click)="$event.stopPropagation()"
+            (mouseenter)="onServiceHover(project.id, 'satellite', $event)"
+            (mouseleave)="onServiceLeave()">
+            <img [src]="icons.satellite.disable" alt="Satellite" class="action-icon-img" />
+            <div 
+              class="service-tooltip" 
+              *ngIf="isServiceHovered(project.id, 'satellite') && getServiceStatus(project.id, 'satellite')"
+              [ngStyle]="getTooltipStyleForService(project.id, 'satellite')">
+              <div class="tooltip-arrow"></div>
+              <div class="tooltip-content">
+                <span class="tooltip-text">{{ getServiceName('satellite') }}</span>
+                <span class="tooltip-badge">ACTIVE</span>
+              </div>
             </div>
-          </div>
-        </button>
-        
-        <!-- Photography -->
-        <button 
-          class="action-btn" 
-          [class.active]="getServiceStatus(project.id, 'photography')" 
-          title="Photography" 
-          (click)="$event.stopPropagation()"
-          (mouseenter)="onServiceHover(project.id, 'photography', $event)"
-          (mouseleave)="onServiceLeave()">
-          <img [src]="icons.camera.disable" alt="Photography" class="action-icon-img" />
-          <div 
-            class="service-tooltip" 
-            *ngIf="isServiceHovered(project.id, 'photography') && getServiceStatus(project.id, 'photography')"
-            [ngStyle]="getTooltipStyleForService(project.id, 'photography')">
-            <div class="tooltip-arrow"></div>
-            <div class="tooltip-content">
-              <span class="tooltip-text">{{ getServiceName('photography') }}</span>
-              <span class="tooltip-badge">ACTIVE</span>
+          </button>
+          
+          <!-- Photography -->
+          <button 
+            class="action-btn" 
+            [class.active]="getServiceStatus(project.id, 'photography')" 
+            title="Photography" 
+            (click)="$event.stopPropagation()"
+            (mouseenter)="onServiceHover(project.id, 'photography', $event)"
+            (mouseleave)="onServiceLeave()">
+            <img [src]="icons.camera.disable" alt="Photography" class="action-icon-img" />
+            <div 
+              class="service-tooltip" 
+              *ngIf="isServiceHovered(project.id, 'photography') && getServiceStatus(project.id, 'photography')"
+              [ngStyle]="getTooltipStyleForService(project.id, 'photography')">
+              <div class="tooltip-arrow"></div>
+              <div class="tooltip-content">
+                <span class="tooltip-text">{{ getServiceName('photography') }}</span>
+                <span class="tooltip-badge">ACTIVE</span>
+              </div>
             </div>
-          </div>
-        </button>
+          </button>
+        </div>
       </div>
     </div>
   </div>
 
-  <div class="map-view" *ngIf="viewMode === 'map'">
+  <!-- Map View - Only created when isMapView() is true -->
+  <div *ngIf="isMapView()" class="map-view-wrapper">
     <div class="map-theme-selector">
       <label for="theme-select">Map Theme:</label>
       <select id="theme-select" [(ngModel)]="mapTheme" (change)="setMapTheme(mapTheme)" class="theme-select">
@@ -235,4 +243,3 @@
     </div>
   </div>
 </div>
-

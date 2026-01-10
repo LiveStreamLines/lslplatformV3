@@ -89,6 +89,73 @@ export class CameraPicsService {
   }
 
   /**
+   * Get direct S3 image URL from path and timestamp
+   * Constructs the URL directly from the S3 path structure: upload/{developer-tag}/{project-tag}/camera/{timestamp}
+   * @param path - Base path from API response (e.g., "http://lsl-platform.com/media/upload/butech/waste/camera1/")
+   * @param timestamp - Image timestamp (YYYYMMDDHHMMSS format, e.g., "20260104003549")
+   * @param extension - File extension (default: ".jpg", will try multiple if first fails)
+   * @returns Direct S3 URL
+   */
+  getDirectS3ImageUrl(path: string, timestamp: string, extension: string = '.jpg'): string {
+    if (!path || !timestamp) {
+      return '';
+    }
+    
+    // Ensure path ends with '/'
+    const cleanPath = path.endsWith('/') ? path : path + '/';
+    
+    // Construct direct URL: path + timestamp + extension
+    // Example: http://lsl-platform.com/media/upload/butech/waste/camera1/20260104003549.jpg
+    return `${cleanPath}${timestamp}${extension}`;
+  }
+
+  /**
+   * Get direct S3 image URLs with multiple extensions (for fallback)
+   * Tries common extensions: .jpg, .jpeg, .png
+   * @param path - Base path from API response
+   * @param timestamp - Image timestamp
+   * @returns Array of possible URLs to try
+   */
+  getDirectS3ImageUrlsWithExtensions(path: string, timestamp: string): string[] {
+    if (!path || !timestamp) {
+      return [];
+    }
+    
+    const extensions = ['.jpg', '.jpeg', '.png'];
+    return extensions.map(ext => this.getDirectS3ImageUrl(path, timestamp, ext));
+  }
+
+  /**
+   * Alternative: Construct direct S3 URL from tags and timestamp
+   * Uses the S3 bucket structure: upload/{developer-tag}/{project-tag}/{camera-tag}/{timestamp}
+   * @param s3BaseUrl - Base S3 URL (e.g., "http://lsl-platform.com/media" or S3 bucket URL)
+   * @param developerTag - Developer tag
+   * @param projectTag - Project tag
+   * @param cameraTag - Camera tag
+   * @param timestamp - Image timestamp (YYYYMMDDHHMMSS format)
+   * @param extension - File extension (default: ".jpg")
+   * @returns Direct S3 URL
+   */
+  getDirectS3ImageUrlFromTags(
+    s3BaseUrl: string, 
+    developerTag: string, 
+    projectTag: string, 
+    cameraTag: string, 
+    timestamp: string, 
+    extension: string = '.jpg'
+  ): string {
+    if (!s3BaseUrl || !developerTag || !projectTag || !cameraTag || !timestamp) {
+      return '';
+    }
+    
+    // Ensure base URL doesn't end with '/'
+    const cleanBaseUrl = s3BaseUrl.endsWith('/') ? s3BaseUrl.slice(0, -1) : s3BaseUrl;
+    
+    // Construct URL: baseUrl/upload/developerTag/projectTag/cameraTag/timestamp.ext
+    return `${cleanBaseUrl}/upload/${developerTag}/${projectTag}/${cameraTag}/${timestamp}${extension}`;
+  }
+
+  /**
    * Get the last image URL for a camera
    * Uses the proxy endpoint to avoid CORS issues
    * Checks cache first to avoid unnecessary API calls

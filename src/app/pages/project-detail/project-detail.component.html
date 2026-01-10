@@ -1,16 +1,16 @@
 <div class="project-detail-page">
-  <!-- Breadcrumb -->
-  <div class="breadcrumb-section">
-    <div class="breadcrumb">
-      <span class="breadcrumb-item clickable" (click)="navigateToCommunities()">Clients</span>
-      <svg class="breadcrumb-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M4.5 3L7.5 6L4.5 9" stroke="#9aa4b2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-      <span class="breadcrumb-item clickable" (click)="navigateToCommunity()">{{ communityName }}</span>
-      <svg class="breadcrumb-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M4.5 3L7.5 6L4.5 9" stroke="#9aa4b2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-      <span class="breadcrumb-item clickable" (click)="navigateToProjects()">{{ projectName }}</span>
+  <!-- Loading Overlay -->
+  <div class="loading-overlay" *ngIf="isLoading || isLoadingCameras || isLoadingImages || isPreloadingLastDayImages">
+    <div class="loading-content">
+      <div class="loading-spinner"></div>
+      <div class="loading-text">
+        <p *ngIf="isLoading">Loading project details...</p>
+        <p *ngIf="!isLoading && isLoadingCameras">Loading cameras...</p>
+        <p *ngIf="!isLoading && !isLoadingCameras && isLoadingImages">Loading camera images...</p>
+        <p *ngIf="!isLoading && !isLoadingCameras && !isLoadingImages && isPreloadingLastDayImages">
+          Preloading last day images... ({{ preloadingProgress.loaded }}/{{ preloadingProgress.total }})
+        </p>
+      </div>
     </div>
   </div>
 
@@ -54,6 +54,28 @@
     </div>
   </div>
 
+  <!-- Breadcrumb (moved under banner) -->
+  <div class="breadcrumb-section">
+    <div class="breadcrumb">
+      <img *ngIf="communityImage" [src]="communityImage" [alt]="communityName" class="breadcrumb-logo clickable" (click)="navigateToCommunities()" />
+      <img *ngIf="!communityImage" src="assets/images/lsl.svg" alt="Clients" class="breadcrumb-logo clickable" (click)="navigateToCommunities()" />
+      <svg class="breadcrumb-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M4.5 3L7.5 6L4.5 9" stroke="#9aa4b2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="breadcrumb-item clickable" (click)="navigateToCommunity()">{{ communityName }}</span>
+      <svg class="breadcrumb-arrow" width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M4.5 3L7.5 6L4.5 9" stroke="#9aa4b2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="breadcrumb-item clickable" (click)="navigateToProjects()">{{ projectName }}</span>
+    </div>
+    <button class="return-to-projects-btn" (click)="navigateToProjects()">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M7.5 9L4.5 6L7.5 3" stroke="#9aa4b2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span>Return to Projects</span>
+    </button>
+  </div>
+
   <!-- Tabs Section -->
   <div class="tabs-section">
     <div class="tab-bar">
@@ -65,17 +87,21 @@
         <span>Timelaps</span>
       </button>
       <button 
-        [class.active]="activeTab === 'live'"
-        (click)="setActiveTab('live')"
+        [class.active]="activeTab === 'live' && isServiceActive('live')"
+        [class.disabled]="!isServiceActive('live')"
+        [disabled]="!isServiceActive('live')"
+        (click)="handleTabClick('live')"
         class="tab-item">
-        <img src="assets/images/icons/project-actions-svg/live-enable.svg" alt="Live" class="tab-icon" />
+        <img [src]="isServiceActive('live') ? icons.live.enable : icons.live.disable" alt="Live" class="tab-icon" />
         <span>Live</span>
       </button>
       <button 
-        [class.active]="activeTab === 'satellite'"
-        (click)="setActiveTab('satellite')"
+        [class.active]="activeTab === 'satellite' && isServiceActive('satellite')"
+        [class.disabled]="!isServiceActive('satellite')"
+        [disabled]="!isServiceActive('satellite')"
+        (click)="handleTabClick('satellite')"
         class="tab-item">
-        <img src="assets/images/icons/project-actions-svg/satellite-enable.svg" alt="Satellite" class="tab-icon" />
+        <img [src]="isServiceActive('satellite') ? icons.satellite.enable : icons.satellite.disable" alt="Satellite" class="tab-icon" />
         <span>Satellite Image</span>
       </button>
       <button 
@@ -94,11 +120,6 @@
     <div class="camera-section">
       <div class="camera-header">
         <div class="camera-header-left">
-          <button class="back-btn" routerLink="/communities">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M7.5 9L4.5 6L7.5 3" stroke="#9aa4b2" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </button>
           <h2 class="camera-count">{{ cameras.length }} Cameras</h2>
         </div>
         <div class="view-toggle">
@@ -122,7 +143,6 @@
           </button>
         </div>
       </div>
-
       <!-- Error State -->
       <div *ngIf="error && !isLoadingCameras && viewMode === 'list'" class="error-state">
         <p>{{ error }}</p>
@@ -264,6 +284,11 @@
           
           <button class="view-details-btn" [routerLink]="['/camera', camera.id]">View Details</button>
         </div>
+      </div>
+
+      <!-- Slideshow View -->
+      <div class="slideshow-view" *ngIf="viewMode === 'slideshow'">
+        <!-- Slideshow content here -->
       </div>
     </div>
   </div>

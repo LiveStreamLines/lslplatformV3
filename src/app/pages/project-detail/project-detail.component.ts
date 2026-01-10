@@ -6,7 +6,7 @@ import { HttpClient } from '@angular/common/http';
 import { forkJoin, of } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
 import * as L from 'leaflet';
-import { PROJECT_IMAGE, NO_IMAGE } from '../../constants/figma-assets';
+import { PROJECT_IMAGE, NO_IMAGE, COMMUNITY_IMAGES, ICONS } from '../../constants/figma-assets';
 import { ProjectsService } from '../../services/projects.service';
 import { CamerasService } from '../../services/cameras.service';
 import { CameraPicsService } from '../../services/camera-pics.service';
@@ -14,6 +14,7 @@ import { CameraPicsCacheService } from '../../services/camera-pics-cache.service
 import { Camera } from '../../models/camera.model';
 import { Project } from '../../models/project.model';
 import { CommunitiesService } from '../../services/communities.service';
+import { ServiceConfigService, ServiceConfig } from '../../services/service-config.service';
 import { API_CONFIG } from '../../config/api.config';
 import { MAP_THEMES, DEFAULT_MAP_THEME } from '../../config/map-themes.config';
 
@@ -29,6 +30,7 @@ export class ProjectDetailComponent implements OnInit, AfterViewInit, OnDestroy 
   project: Project | null = null;
   projectName = 'Loading...';
   communityName = 'Loading...';
+  communityImage: string = '';
   daysCompleted = 0;
   totalDays = 0;
   progressPercentage = 0;
@@ -39,11 +41,17 @@ export class ProjectDetailComponent implements OnInit, AfterViewInit, OnDestroy 
   viewMode: 'list' | 'map' | 'slideshow' = 'list';
   mapTheme: string = DEFAULT_MAP_THEME; // Current map theme
   
+  serviceConfig: ServiceConfig | null = null;
+  icons = ICONS;
+  
   cameras: Camera[] = [];
   isLoading = false;
   isLoadingCameras = false;
+  isLoadingImages = false; // Track if we're loading camera images
+  isPreloadingLastDayImages = false; // Track if we're preloading last day images
   error: string | null = null;
   loadingImages: Set<string> = new Set(); // Track which camera images are loading
+  preloadingProgress: { loaded: number; total: number } = { loaded: 0, total: 0 }; // Track preloading progress
 
   hoveredCameraId: string | null = null;
   quickViewCamera: Camera | null = null;
@@ -73,6 +81,7 @@ export class ProjectDetailComponent implements OnInit, AfterViewInit, OnDestroy 
     private camerasService: CamerasService,
     private cameraPicsService: CameraPicsService,
     private communitiesService: CommunitiesService,
+    private serviceConfigService: ServiceConfigService,
     private cacheService: CameraPicsCacheService
   ) {}
 
@@ -88,6 +97,13 @@ export class ProjectDetailComponent implements OnInit, AfterViewInit, OnDestroy 
   }
 
   setActiveTab(tab: 'timelaps' | 'live' | 'satellite' | 'gallery') {
+    // Prevent switching to inactive services
+    if (tab === 'live' && !this.isServiceActive('live')) {
+      return;
+    }
+    if (tab === 'satellite' && !this.isServiceActive('satellite')) {
+      return;
+    }
     this.activeTab = tab;
   }
 
@@ -155,6 +171,42 @@ export class ProjectDetailComponent implements OnInit, AfterViewInit, OnDestroy 
     }
   }
 
+  /**
+   * Calculate project progress based on creation date
+   * Uses 3 years (1095 days) as total duration
+   */
+  private calculateProjectProgress(project: Project): { daysCompleted: number; totalDays: number } {
+    const THREE_YEARS_DAYS = 1095; // 3 years = 365 * 3 = 1095 days
+    const totalDays = THREE_YEARS_DAYS;
+
+    if (!project.createdDate) {
+      // If no creation date, return 0 progress
+      return { daysCompleted: 0, totalDays };
+    }
+
+    try {
+      // Parse creation date (assuming ISO format or YYYY-MM-DD)
+      const createdDate = new Date(project.createdDate);
+      const today = new Date();
+      
+      // Set time to midnight for accurate day calculation
+      today.setHours(0, 0, 0, 0);
+      createdDate.setHours(0, 0, 0, 0);
+
+      // Calculate days difference
+      const timeDiff = today.getTime() - createdDate.getTime();
+      const daysDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+
+      // Days completed should be between 0 and totalDays
+      const daysCompleted = Math.max(0, Math.min(daysDiff, totalDays));
+
+      return { daysCompleted, totalDays };
+    } catch (error) {
+      console.error('Error calculating project progress for project:', project.id, error);
+      return { daysCompleted: 0, totalDays };
+    }
+  }
+
   loadProject() {
     if (!this.projectId) return;
 
@@ -163,15 +215,31 @@ export class ProjectDetailComponent implements OnInit, AfterViewInit, OnDestroy 
     this.bannerImage = null; // Reset banner image when starting new load
     this.error = null;
 
-    this.projectsService.getProjectById(this.projectId).subscribe({
-      next: (project) => {
+    // Load project and service config in parallel
+    forkJoin({
+      project: this.projectsService.getProjectById(this.projectId),
+      serviceConfig: this.serviceConfigService.getServiceConfig()
+    }).subscribe({
+      next: ({ project, serviceConfig }) => {
         this.project = project;
         this.projectName = project.name;
-        this.daysCompleted = project.daysCompleted || 0;
-        this.totalDays = project.totalDays || 0;
+        this.serviceConfig = serviceConfig;
+        
+        // Calculate progress based on creation date (3 years = 1095 days)
+        const calculatedProgress = this.calculateProjectProgress(project);
+        this.daysCompleted = calculatedProgress.daysCompleted;
+        this.totalDays = calculatedProgress.totalDays;
         this.progressPercentage = this.totalDays > 0 
           ? Math.round((this.daysCompleted / this.totalDays) * 100) 
           : 0;
+        
+        // If current active tab is disabled, switch to timelaps
+        if (this.activeTab === 'live' && !this.isServiceActive('live')) {
+          this.activeTab = 'timelaps';
+        }
+        if (this.activeTab === 'satellite' && !this.isServiceActive('satellite')) {
+          this.activeTab = 'timelaps';
+        }
 
         // Load community/developer name and developer tag in parallel
         if (project.developer) {
@@ -181,10 +249,13 @@ export class ProjectDetailComponent implements OnInit, AfterViewInit, OnDestroy 
           }).subscribe({
             next: (results) => {
               this.communityName = results.community.name;
+              this.communityImage = results.community.image || COMMUNITY_IMAGES[results.community.name as keyof typeof COMMUNITY_IMAGES] || '';
               this.developerTag = results.developer.developerTag || '';
               // If cameras are already loaded, load images now
               if (this.cameras.length > 0) {
                 this.loadImagesWithTags(this.cameras, this.developerTag, project.projectTag || '');
+                // Preload last day images for all cameras
+                this.preloadLastDayImagesForAllCameras(this.cameras, this.developerTag, project.projectTag || '');
               }
             },
             error: (err) => {
@@ -225,10 +296,53 @@ export class ProjectDetailComponent implements OnInit, AfterViewInit, OnDestroy 
     });
   }
 
+  /**
+   * Check if a service is active for the current project
+   */
+  isServiceActive(service: 'live' | 'satellite'): boolean {
+    if (!this.project || !this.serviceConfig) {
+      return false;
+    }
+    
+    if (service === 'live') {
+      return this.serviceConfigService.isServiceActive(this.project.projectTag, 'live', this.serviceConfig);
+    }
+    
+    // Satellite is always inactive for now (not in service config)
+    if (service === 'satellite') {
+      return false;
+    }
+    
+    return false;
+  }
+
+  /**
+   * Handle tab click - prevent switching to inactive services
+   */
+  handleTabClick(tab: 'timelaps' | 'live' | 'satellite' | 'gallery') {
+    // Allow timelaps and gallery always
+    if (tab === 'timelaps' || tab === 'gallery') {
+      this.setActiveTab(tab);
+      return;
+    }
+    
+    // Check if service is active before switching
+    if (tab === 'live' && !this.isServiceActive('live')) {
+      return; // Don't switch if service is inactive
+    }
+    
+    if (tab === 'satellite' && !this.isServiceActive('satellite')) {
+      return; // Don't switch if service is inactive
+    }
+    
+    this.setActiveTab(tab);
+  }
+
   loadCameras() {
     if (!this.projectId) return;
 
     this.isLoadingCameras = true;
+    this.isLoadingImages = true;
     this.error = null;
 
     this.camerasService.getCamerasByProjectId(this.projectId).subscribe({
@@ -242,8 +356,8 @@ export class ProjectDetailComponent implements OnInit, AfterViewInit, OnDestroy 
         // If we already have developerTag and projectTag, load images immediately
         if (this.project && this.developerTag && this.project.projectTag) {
           this.loadImagesWithTags(cameras, this.developerTag, this.project.projectTag);
-          // Start preloading last day and last 7 days images in background
-          this.startPreloadingCameraImages(cameras, this.developerTag, this.project.projectTag);
+          // Start preloading last day images for all cameras
+          this.preloadLastDayImagesForAllCameras(cameras, this.developerTag, this.project.projectTag);
         } else {
           // Otherwise, wait for tags to be loaded
           this.loadLastImagesForCameras(cameras);
@@ -261,6 +375,7 @@ export class ProjectDetailComponent implements OnInit, AfterViewInit, OnDestroy 
         console.error('Error loading cameras:', err);
         this.error = 'Failed to load cameras.';
         this.isLoadingCameras = false;
+        this.isLoadingImages = false;
         this.cameras = [];
       }
     });
@@ -286,6 +401,9 @@ export class ProjectDetailComponent implements OnInit, AfterViewInit, OnDestroy 
       return;
     }
 
+    // Store paths for cameras to use for direct S3 URLs
+    const cameraPaths: Map<string, string> = new Map();
+
     // Create observables for fetching last images for each camera using tags
     const imageRequests = cameras.map(camera => {
       // First try to get from cache
@@ -296,11 +414,14 @@ export class ProjectDetailComponent implements OnInit, AfterViewInit, OnDestroy 
       );
 
       if (cachedTimestamp) {
-        // Return cached data immediately
+        // Return cached data immediately - try to use direct S3 URL if we have path
+        // For cached timestamps, we'll still use proxied URL since we don't have path stored
+        // In production, you might want to cache the path as well
         return of({
           cameraId: camera.id,
           imageUrl: this.cameraPicsService.getProxiedImageUrl(developerTag, projectTag, camera.camera, cachedTimestamp),
-          lastPhotoTimestamp: cachedTimestamp
+          lastPhotoTimestamp: cachedTimestamp,
+          path: '' // No path available for cached data
         });
       }
 
@@ -320,15 +441,33 @@ export class ProjectDetailComponent implements OnInit, AfterViewInit, OnDestroy 
               response.lastPhoto
             );
           }
+          // Store path for this camera
+          if (response.path) {
+            cameraPaths.set(camera.id, response.path);
+          }
+          
+          // Use direct S3 URL if path is available (faster than proxy), otherwise use proxied URL
+          let imageUrl = '';
+          if (response.lastPhoto) {
+            if (response.path) {
+              // Use direct S3 URL from path - much faster!
+              imageUrl = this.cameraPicsService.getDirectS3ImageUrl(response.path, response.lastPhoto);
+              console.log(`✓ Using direct S3 URL for camera ${camera.name}: ${imageUrl}`);
+            } else {
+              // Fallback to proxied URL
+              imageUrl = this.cameraPicsService.getProxiedImageUrl(developerTag, projectTag, camera.camera, response.lastPhoto);
+            }
+          }
           return {
             cameraId: camera.id,
-            imageUrl: response.lastPhoto ? this.cameraPicsService.getProxiedImageUrl(developerTag, projectTag, camera.camera, response.lastPhoto) : '',
-            lastPhotoTimestamp: response.lastPhoto || ''
+            imageUrl: imageUrl,
+            lastPhotoTimestamp: response.lastPhoto || '',
+            path: response.path || '' // Store path for future use
           };
         }),
         catchError(error => {
           console.warn(`Failed to load last image for camera ${camera.id}:`, error);
-          return of({ cameraId: camera.id, imageUrl: '', lastPhotoTimestamp: '' });
+          return of({ cameraId: camera.id, imageUrl: '', lastPhotoTimestamp: '', path: '' });
         })
       );
     });
@@ -337,6 +476,10 @@ export class ProjectDetailComponent implements OnInit, AfterViewInit, OnDestroy 
     cameras.forEach(camera => {
       this.loadingImages.add(camera.id);
     });
+
+    // Track loading completion
+    let completedCount = 0;
+    const totalCameras = cameras.length;
 
     // Subscribe to each request immediately so images load as soon as available
     // This provides progressive loading instead of waiting for all images
@@ -351,18 +494,34 @@ export class ProjectDetailComponent implements OnInit, AfterViewInit, OnDestroy 
               camera.lastPhotoTime = this.formatTimestampToTime(result.lastPhotoTimestamp);
               // Calculate and update status based on last photo timestamp
               camera.status = this.calculateStatusFromTimestamp(result.lastPhotoTimestamp);
+              // Store path if available for future direct S3 URL construction
+              if ((result as any).path) {
+                cameraPaths.set(camera.id, (result as any).path);
+              }
+              
               // Preload image before setting to avoid static image flash
+              // Use direct S3 URL if available, otherwise fall back to proxied
               if (result.imageUrl) {
-                this.preloadImageWithFallback(
-                  camera,
-                  result.lastPhotoTimestamp,
-                  developerTag,
-                  projectTag,
-                  camera.camera
-                );
+                // If we have path, use direct S3 URL for preloading
+                if ((result as any).path && result.lastPhotoTimestamp) {
+                  const directUrl = this.cameraPicsService.getDirectS3ImageUrl((result as any).path, result.lastPhotoTimestamp);
+                  this.preloadImageWithDirectUrl(camera, directUrl, result.lastPhotoTimestamp, developerTag, projectTag, camera.camera);
+                } else {
+                  this.preloadImageWithFallback(
+                    camera,
+                    result.lastPhotoTimestamp,
+                    developerTag,
+                    projectTag,
+                    camera.camera
+                  );
+                }
               } else {
                 // No image URL, remove from loading
                 this.loadingImages.delete(camera.id);
+                completedCount++;
+                if (completedCount === totalCameras) {
+                  this.isLoadingImages = false;
+                }
               }
             } else {
               // No timestamp means no images - set status to 'Removed' and set image to no-image.png
@@ -372,6 +531,10 @@ export class ProjectDetailComponent implements OnInit, AfterViewInit, OnDestroy 
               camera.lastPhotoDate = 'N/A';
               camera.lastPhotoTime = 'N/A';
               this.loadingImages.delete(camera.id); // Stop skeleton
+              completedCount++;
+              if (completedCount === totalCameras) {
+                this.isLoadingImages = false;
+              }
             }
             // Loading state is managed in the preload handlers above
           }
@@ -566,6 +729,44 @@ export class ProjectDetailComponent implements OnInit, AfterViewInit, OnDestroy 
   /**
    * Preload image with fallback to previous images if current one fails
    */
+  /**
+   * Preload image using direct S3 URL (faster than proxy)
+   * Falls back to proxied URL if direct URL fails
+   */
+  private preloadImageWithDirectUrl(
+    camera: Camera,
+    directUrl: string,
+    timestamp: string,
+    developerTag: string,
+    projectTag: string,
+    cameraTag: string
+  ) {
+    if (!directUrl || !timestamp || timestamp.length < 14) {
+      // Invalid URL or timestamp, fall back to proxied URL
+      this.preloadImageWithFallback(camera, timestamp, developerTag, projectTag, cameraTag);
+      return;
+    }
+
+    const img = new Image();
+    
+    img.onload = () => {
+      // Direct S3 URL loaded successfully - much faster!
+      camera.image = directUrl;
+      camera.thumbnail = directUrl;
+      this.loadingImages.delete(camera.id);
+      this.checkAllImagesLoaded();
+      console.log(`✓ Direct S3 URL loaded successfully for camera ${camera.name}`);
+    };
+    
+    img.onerror = () => {
+      // Direct S3 URL failed (might be CORS issue or wrong path), fall back to proxied URL
+      console.warn(`Direct S3 URL failed for camera ${camera.name}, falling back to proxied URL`);
+      this.preloadImageWithFallback(camera, timestamp, developerTag, projectTag, cameraTag);
+    };
+    
+    img.src = directUrl;
+  }
+
   private preloadImageWithFallback(
     camera: Camera,
     timestamp: string,
@@ -591,6 +792,8 @@ export class ProjectDetailComponent implements OnInit, AfterViewInit, OnDestroy 
       camera.image = imageUrl;
       camera.thumbnail = imageUrl;
       this.loadingImages.delete(camera.id);
+      // Check if all images are loaded
+      this.checkAllImagesLoaded();
     };
     
     img.onerror = () => {
@@ -752,7 +955,7 @@ export class ProjectDetailComponent implements OnInit, AfterViewInit, OnDestroy 
   /**
    * Handle image load failure
    */
-  private   handleImageLoadFailure(camera: Camera) {
+  private handleImageLoadFailure(camera: Camera) {
     // If camera is removed, show no-image.png and stop skeleton
     if (camera.status === 'Removed') {
       camera.image = NO_IMAGE;
@@ -764,6 +967,175 @@ export class ProjectDetailComponent implements OnInit, AfterViewInit, OnDestroy 
       camera.status = 'Stopped';
     }
     this.loadingImages.delete(camera.id);
+    // Check if all images are loaded
+    this.checkAllImagesLoaded();
+  }
+
+  /**
+   * Check if all camera images are loaded
+   */
+  private checkAllImagesLoaded() {
+    if (this.loadingImages.size === 0 && this.cameras.length > 0) {
+      this.isLoadingImages = false;
+    }
+  }
+
+  /**
+   * Preload last day images for all cameras
+   * This ensures images are ready when user clicks on camera-detail
+   */
+  private preloadLastDayImagesForAllCameras(cameras: Camera[], developerTag: string, projectTag: string) {
+    if (!cameras || cameras.length === 0) {
+      this.isPreloadingLastDayImages = false;
+      return;
+    }
+
+    this.isPreloadingLastDayImages = true;
+    this.preloadingProgress = { loaded: 0, total: cameras.filter(c => c.camera && c.status !== 'Removed').length };
+
+    const activeCameras = cameras.filter(c => c.camera && c.status !== 'Removed');
+    
+    if (activeCameras.length === 0) {
+      this.isPreloadingLastDayImages = false;
+      return;
+    }
+
+    // Get today's date
+    const today = new Date();
+    const todayStr = today.getFullYear().toString() +
+      String(today.getMonth() + 1).padStart(2, '0') +
+      String(today.getDate()).padStart(2, '0');
+
+    // Load last day images for all cameras in parallel
+    const preloadRequests = activeCameras.map(camera => {
+      // Check if already cached
+      if (this.cacheService.hasDateImages(developerTag, projectTag, camera.camera!, todayStr)) {
+        this.preloadingProgress.loaded++;
+        if (this.preloadingProgress.loaded === this.preloadingProgress.total) {
+          this.isPreloadingLastDayImages = false;
+        }
+        return of(null);
+      }
+
+      // Use getCameraPictures to get today's images with timestamps
+      return this.cameraPicsService.getCameraPictures(developerTag, projectTag, camera.camera!, todayStr, todayStr).pipe(
+        map(response => {
+          const allPhotos = [...new Set([...response.date1Photos, ...response.date2Photos])];
+          
+          if (allPhotos.length > 0) {
+            // Try to use direct S3 URLs if path is available (faster than proxy)
+            // Otherwise fall back to proxied URLs
+            const imageUrls = allPhotos.map(timestamp => {
+              if (response.path) {
+                // Use direct S3 URL from path - much faster!
+                return this.cameraPicsService.getDirectS3ImageUrl(response.path, timestamp);
+              } else {
+                // Fallback to proxied URL
+                return this.cameraPicsService.getProxiedImageUrl(developerTag, projectTag, camera.camera!, timestamp);
+              }
+            });
+
+            // Cache the images with timestamps
+            this.cacheService.setDateImages(
+              developerTag,
+              projectTag,
+              camera.camera!,
+              todayStr,
+              allPhotos,
+              imageUrls
+            );
+
+            // Preload images in browser cache using direct S3 URLs for faster loading
+            const startTime = performance.now();
+            imageUrls.forEach((url, index) => {
+              const timestamp = allPhotos[index]; // Get corresponding timestamp
+              const img = new Image();
+              img.onload = () => {
+                if (index === allPhotos.length - 1) {
+                  const loadTime = performance.now() - startTime;
+                  console.log(`✓ Preloaded ${allPhotos.length} images for ${camera.name} (${todayStr}) in ${loadTime.toFixed(0)}ms using direct S3 URLs`);
+                }
+              };
+              img.onerror = () => {
+                // If direct S3 URL fails, try proxied URL as fallback
+                console.warn(`Direct S3 URL failed for ${timestamp}, trying proxied URL...`);
+                const proxiedUrl = this.cameraPicsService.getProxiedImageUrl(developerTag, projectTag, camera.camera!, timestamp);
+                const fallbackImg = new Image();
+                fallbackImg.src = proxiedUrl;
+              };
+              img.src = url;
+            });
+
+            console.log(`Preloading ${allPhotos.length} images for ${camera.name} (${todayStr}) using direct S3 URLs from path: ${response.path}`);
+          } else {
+            // No images for today, try yesterday
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+            const yesterdayStr = yesterday.getFullYear().toString() +
+              String(yesterday.getMonth() + 1).padStart(2, '0') +
+              String(yesterday.getDate()).padStart(2, '0');
+
+            if (!this.cacheService.hasDateImages(developerTag, projectTag, camera.camera!, yesterdayStr)) {
+              // Load yesterday's images asynchronously (don't wait)
+              this.cameraPicsService.getCameraPictures(developerTag, projectTag, camera.camera!, yesterdayStr, yesterdayStr).subscribe({
+                next: (yesterdayResponse) => {
+                  const yesterdayPhotos = [...new Set([...yesterdayResponse.date1Photos, ...yesterdayResponse.date2Photos])];
+                  if (yesterdayPhotos.length > 0) {
+                    // Use direct S3 URLs if path is available
+                    const yesterdayUrls = yesterdayPhotos.map(timestamp => {
+                      if (yesterdayResponse.path) {
+                        return this.cameraPicsService.getDirectS3ImageUrl(yesterdayResponse.path, timestamp);
+                      } else {
+                        return this.cameraPicsService.getProxiedImageUrl(developerTag, projectTag, camera.camera!, timestamp);
+                      }
+                    });
+                    this.cacheService.setDateImages(
+                      developerTag,
+                      projectTag,
+                      camera.camera!,
+                      yesterdayStr,
+                      yesterdayPhotos,
+                      yesterdayUrls
+                    );
+                    // Preload images using direct S3 URLs
+                    yesterdayUrls.forEach(url => {
+                      const img = new Image();
+                      img.src = url;
+                    });
+                    console.log(`Preloaded ${yesterdayPhotos.length} images for ${camera.name} (${yesterdayStr}) using direct S3 URLs`);
+                  }
+                }
+              });
+            }
+          }
+          this.preloadingProgress.loaded++;
+          if (this.preloadingProgress.loaded === this.preloadingProgress.total) {
+            this.isPreloadingLastDayImages = false;
+          }
+          return null;
+        }),
+        catchError(error => {
+          console.warn(`Failed to preload last day images for camera ${camera.id}:`, error);
+          this.preloadingProgress.loaded++;
+          if (this.preloadingProgress.loaded === this.preloadingProgress.total) {
+            this.isPreloadingLastDayImages = false;
+          }
+          return of(null);
+        })
+      );
+    });
+
+    // Execute all preload requests
+    forkJoin(preloadRequests).subscribe({
+      next: () => {
+        console.log('Finished preloading last day images for all cameras');
+        this.isPreloadingLastDayImages = false;
+      },
+      error: (err) => {
+        console.error('Error preloading last day images:', err);
+        this.isPreloadingLastDayImages = false;
+      }
+    });
   }
 
   /**

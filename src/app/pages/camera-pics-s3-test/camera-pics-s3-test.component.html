@@ -1,0 +1,753 @@
+<div class="test-container">
+  <h2>Camera Pictures S3 Test</h2>
+  <p>Test component for cameraPicsControllerS3Test endpoints (iDrive E2 bucket)</p>
+
+  <!-- Common Input Form -->
+  <mat-card class="input-card">
+    <mat-card-header>
+      <mat-card-title>Common Parameters</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <div class="form-group">
+        <mat-form-field appearance="outline">
+          <mat-label>Developer ID</mat-label>
+          <input matInput [(ngModel)]="developerId" placeholder="cscec">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Project ID</mat-label>
+          <input matInput [(ngModel)]="projectId" placeholder="rta">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Camera ID</mat-label>
+          <input matInput [(ngModel)]="cameraId" placeholder="camera1">
+        </mat-form-field>
+      </div>
+
+      <div class="form-group">
+        <mat-form-field appearance="outline">
+          <mat-label>Date 1 (YYYYMMDD) - Optional</mat-label>
+          <input matInput [(ngModel)]="date1" placeholder="20240101">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Date 2 (YYYYMMDD) - Optional</mat-label>
+          <input matInput [(ngModel)]="date2" placeholder="20240131">
+        </mat-form-field>
+      </div>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- Tabs for different endpoints -->
+  <mat-tab-group>
+    <!-- Tab 1: Get Camera Pictures -->
+    <mat-tab label="Get Camera Pictures">
+      <div class="tab-content">
+        <button mat-raised-button color="primary" (click)="getCameraPictures()" [disabled]="loadingPictures">
+          <span *ngIf="loadingPictures">
+            <mat-spinner diameter="20" style="display: inline-block; margin-right: 8px;"></mat-spinner>
+            Loading...
+          </span>
+          <span *ngIf="!loadingPictures">Get Camera Pictures</span>
+        </button>
+
+        <div *ngIf="picturesError" class="error-message">
+          <mat-card class="error-card">
+            <mat-card-content>
+              <strong>Error:</strong> {{ picturesError }}
+            </mat-card-content>
+          </mat-card>
+        </div>
+
+        <div *ngIf="picturesResponse" class="response-section">
+          <mat-card>
+            <mat-card-header>
+              <mat-card-title>Response</mat-card-title>
+            </mat-card-header>
+            <mat-card-content>
+              <p><strong>Path:</strong> {{ picturesResponse.path }}</p>
+              
+              <!-- Performance Test Section -->
+              <div class="performance-test-section" *ngIf="picturesResponse && ((picturesResponse.date1Photos && picturesResponse.date1Photos.length > 0) || (picturesResponse.date2Photos && picturesResponse.date2Photos.length > 0))">
+                <h4>Performance Test: Presigned URLs (/image endpoint)</h4>
+                <p>Test loading speed using presigned S3 URLs from the <code>/image</code> endpoint</p>
+                <p><strong>Presigned URLs:</strong> Direct S3 access with proper authentication</p>
+                <p><strong>Format:</strong> <code>https://s3.ap-southeast-1.idrivee2.com/camera-pictures/upload/.../large/timestamp.jpg?[auth params]</code></p>
+                
+                <div class="performance-controls">
+                  <button mat-raised-button color="accent" (click)="testPresignedUrlPerformance()" class="performance-test-btn">
+                    Run Performance Test
+                  </button>
+                </div>
+                
+                <!-- Performance Metrics -->
+                <div class="performance-metrics" *ngIf="performanceMetrics.directS3 || performanceMetrics.proxied">
+                  <div class="metric-card" *ngIf="performanceMetrics.directS3 && performanceMetrics.directS3.loaded > 0">
+                    <h5>Presigned URLs (/image endpoint)</h5>
+                    <p><strong>Duration:</strong> {{ performanceMetrics.directS3.duration.toFixed(2) }}ms</p>
+                    <p><strong>Loaded:</strong> {{ performanceMetrics.directS3.loaded }}/{{ ((picturesResponse?.date1Photos?.length || 0) + (picturesResponse?.date2Photos?.length || 0)) }}</p>
+                    <p><strong>Average:</strong> {{ (performanceMetrics.directS3.duration / performanceMetrics.directS3.loaded).toFixed(2) }}ms per image</p>
+                    <p><em>Direct S3 access with proper authentication</em></p>
+                  </div>
+                  
+                  <div class="metric-card" *ngIf="performanceMetrics.proxied && performanceMetrics.proxied.loaded > 0">
+                    <h5>Proxied URLs (for comparison)</h5>
+                    <p><strong>Duration:</strong> {{ performanceMetrics.proxied.duration.toFixed(2) }}ms</p>
+                    <p><strong>Loaded:</strong> {{ performanceMetrics.proxied.loaded }}/{{ ((picturesResponse?.date1Photos?.length || 0) + (picturesResponse?.date2Photos?.length || 0)) }}</p>
+                    <p><strong>Average:</strong> {{ (performanceMetrics.proxied.duration / performanceMetrics.proxied.loaded).toFixed(2) }}ms per image</p>
+                  </div>
+                  
+                  <div class="metric-card comparison" *ngIf="performanceMetrics.directS3 && performanceMetrics.proxied && performanceMetrics.directS3.loaded > 0 && performanceMetrics.proxied.loaded > 0">
+                    <h5>Performance Comparison</h5>
+                    <p><strong>Speedup:</strong> 
+                      <span class="speedup-positive" *ngIf="performanceMetrics.directS3.duration < performanceMetrics.proxied.duration">
+                        {{ (((performanceMetrics.proxied.duration - performanceMetrics.directS3.duration) / performanceMetrics.proxied.duration) * 100).toFixed(1) }}% faster with presigned URLs
+                      </span>
+                      <span class="speedup-negative" *ngIf="performanceMetrics.directS3.duration >= performanceMetrics.proxied.duration">
+                        {{ (((performanceMetrics.directS3.duration - performanceMetrics.proxied.duration) / performanceMetrics.proxied.duration) * 100).toFixed(1) }}% slower (possibly network/CORS issues)
+                      </span>
+                    </p>
+                    <p><strong>Time Saved:</strong> {{ Math.abs(performanceMetrics.proxied.duration - performanceMetrics.directS3.duration).toFixed(2) }}ms</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div *ngIf="picturesResponse && picturesResponse.firstPhoto" class="photo-section">
+                <h4>First Photo:</h4>
+                <p>{{ formatTimestamp(picturesResponse.firstPhoto) }}</p>
+                <img [src]="getImageUrlWithFetch(picturesResponse.firstPhoto)" 
+                     [alt]="picturesResponse.firstPhoto"
+                     (error)="onImageError($event)"
+                     class="preview-image"
+                     [style.filter]="getImageFilter()"
+                     *ngIf="hasImageUrl(picturesResponse.firstPhoto)">
+                <div *ngIf="!hasImageUrl(picturesResponse.firstPhoto)" class="image-loading">
+                  <mat-spinner diameter="40"></mat-spinner>
+                  <p>Loading image...</p>
+                </div>
+              </div>
+
+              <div *ngIf="picturesResponse.lastPhoto" class="photo-section">
+                <h4>Last Photo:</h4>
+                <p>{{ formatTimestamp(picturesResponse.lastPhoto) }}</p>
+                <img [src]="getImageUrlWithFetch(picturesResponse.lastPhoto)" 
+                     [alt]="picturesResponse.lastPhoto"
+                     (error)="onImageError($event)"
+                     class="preview-image"
+                     [style.filter]="getImageFilter()"
+                     *ngIf="hasImageUrl(picturesResponse.lastPhoto)">
+                <div *ngIf="!hasImageUrl(picturesResponse.lastPhoto)" class="image-loading">
+                  <mat-spinner diameter="40"></mat-spinner>
+                  <p>Loading image...</p>
+                </div>
+              </div>
+
+              <div *ngIf="picturesResponse && picturesResponse.date1Photos && picturesResponse.date1Photos.length > 0" class="photo-section">
+                <h4>Date 1 Photos ({{ picturesResponse.date1Photos.length }}):</h4>
+                
+                <!-- Large preview image -->
+                <div class="large-preview-container" *ngIf="selectedDate1Image">
+                  <div class="large-preview-wrapper">
+                    <div class="image-with-filter-button" *ngIf="hasImageUrl(selectedDate1Image)">
+                      <button mat-raised-button 
+                              color="primary" 
+                              class="filter-toggle-button"
+                              (click)="toggleFilters()">
+                        {{ filtersEnabled ? 'Original' : 'Enhanced' }}
+                      </button>
+                      <img [src]="getImageUrlWithFetch(selectedDate1Image)" 
+                           [alt]="selectedDate1Image"
+                           (error)="onImageError($event)"
+                           class="large-preview-image"
+                           [style.filter]="getImageFilter()">
+                    </div>
+                    <div *ngIf="!hasImageUrl(selectedDate1Image)" class="image-loading-large">
+                      <mat-spinner diameter="50"></mat-spinner>
+                      <p>Loading image...</p>
+                    </div>
+                    <p class="large-preview-timestamp">{{ formatTimestamp(selectedDate1Image) }}</p>
+                  </div>
+                </div>
+
+                <!-- Thumbnail strip -->
+                <div class="thumbnail-strip-container">
+                  <div class="thumbnail-strip">
+                    <div *ngFor="let photo of picturesResponse.date1Photos" 
+                         class="thumbnail-item"
+                         [class.selected]="selectedDate1Image === photo"
+                         (click)="selectDate1Image(photo)">
+                      <img [src]="getImageUrlWithFetch(photo)" 
+                           [alt]="photo"
+                           (error)="onImageError($event)"
+                           class="thumbnail-image"
+                           [style.filter]="getImageFilter()"
+                           *ngIf="hasImageUrl(photo)">
+                      <div *ngIf="!hasImageUrl(photo)" class="thumbnail-loading">
+                        <mat-spinner diameter="20"></mat-spinner>
+                      </div>
+                      <p class="thumbnail-timestamp">{{ formatTimestamp(photo) }}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div *ngIf="picturesResponse && picturesResponse.date2Photos && picturesResponse.date2Photos.length > 0" class="photo-section">
+                <h4>Date 2 Photos ({{ picturesResponse.date2Photos.length }}):</h4>
+                
+                <!-- Large preview image -->
+                <div class="large-preview-container" *ngIf="selectedDate2Image">
+                  <div class="large-preview-wrapper">
+                    <div class="image-with-filter-button" *ngIf="hasImageUrl(selectedDate2Image)">
+                      <button mat-raised-button 
+                              color="primary" 
+                              class="filter-toggle-button"
+                              (click)="toggleFilters()">
+                        {{ filtersEnabled ? 'Original' : 'Enhanced' }}
+                      </button>
+                      <img [src]="getImageUrlWithFetch(selectedDate2Image)" 
+                           [alt]="selectedDate2Image"
+                           (error)="onImageError($event)"
+                           class="large-preview-image"
+                           [style.filter]="getImageFilter()">
+                    </div>
+                    <div *ngIf="!hasImageUrl(selectedDate2Image)" class="image-loading-large">
+                      <mat-spinner diameter="50"></mat-spinner>
+                      <p>Loading image...</p>
+                    </div>
+                    <p class="large-preview-timestamp">{{ formatTimestamp(selectedDate2Image) }}</p>
+                  </div>
+                </div>
+
+                <!-- Thumbnail strip -->
+                <div class="thumbnail-strip-container">
+                  <div class="thumbnail-strip">
+                    <div *ngFor="let photo of picturesResponse.date2Photos" 
+                         class="thumbnail-item"
+                         [class.selected]="selectedDate2Image === photo"
+                         (click)="selectDate2Image(photo)">
+                      <img [src]="getImageUrlWithFetch(photo)" 
+                           [alt]="photo"
+                           (error)="onImageError($event)"
+                           class="thumbnail-image"
+                           [style.filter]="getImageFilter()"
+                           *ngIf="hasImageUrl(photo)">
+                      <div *ngIf="!hasImageUrl(photo)" class="thumbnail-loading">
+                        <mat-spinner diameter="20"></mat-spinner>
+                      </div>
+                      <p class="thumbnail-timestamp">{{ formatTimestamp(photo) }}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </mat-card-content>
+          </mat-card>
+        </div>
+      </div>
+    </mat-tab>
+
+    <!-- Tab 2: Camera Preview Slideshow -->
+    <mat-tab label="Camera Preview">
+      <div class="tab-content">
+        <div class="slideshow-controls">
+          <h3>Select Time Range</h3>
+          <div class="range-buttons">
+            <button mat-raised-button 
+                    color="primary" 
+                    (click)="loadSlideshow('30days')" 
+                    [disabled]="loadingSlideshow"
+                    [class.active]="selectedRangeType === '30days'">
+              <span *ngIf="loadingSlideshow && selectedRangeType === '30days'">
+                <mat-spinner diameter="20" style="display: inline-block; margin-right: 8px;"></mat-spinner>
+              </span>
+              Last 30 Days
+            </button>
+            
+            <button mat-raised-button 
+                    color="primary" 
+                    (click)="loadSlideshow('quarter')" 
+                    [disabled]="loadingSlideshow"
+                    [class.active]="selectedRangeType === 'quarter'">
+              <span *ngIf="loadingSlideshow && selectedRangeType === 'quarter'">
+                <mat-spinner diameter="20" style="display: inline-block; margin-right: 8px;"></mat-spinner>
+              </span>
+              Last Quarter
+            </button>
+            
+            <button mat-raised-button 
+                    color="primary" 
+                    (click)="loadSlideshow('6months')" 
+                    [disabled]="loadingSlideshow"
+                    [class.active]="selectedRangeType === '6months'">
+              <span *ngIf="loadingSlideshow && selectedRangeType === '6months'">
+                <mat-spinner diameter="20" style="display: inline-block; margin-right: 8px;"></mat-spinner>
+              </span>
+              Last 6 Months
+            </button>
+            
+            <button mat-raised-button 
+                    color="primary" 
+                    (click)="loadSlideshow('1year')" 
+                    [disabled]="loadingSlideshow"
+                    [class.active]="selectedRangeType === '1year'">
+              <span *ngIf="loadingSlideshow && selectedRangeType === '1year'">
+                <mat-spinner diameter="20" style="display: inline-block; margin-right: 8px;"></mat-spinner>
+              </span>
+              1 Year
+            </button>
+          </div>
+        </div>
+
+        <div *ngIf="slideshowError" class="error-message">
+          <mat-card class="error-card">
+            <mat-card-content>
+              <strong>Error:</strong> {{ slideshowError }}
+            </mat-card-content>
+          </mat-card>
+        </div>
+
+        <div *ngIf="slideshowResponse" class="slideshow-container">
+          <mat-card>
+            <mat-card-header>
+              <mat-card-title>
+                {{ slideshowResponse.description }} ({{ slideshowResponse.count }} images)
+              </mat-card-title>
+            </mat-card-header>
+            <mat-card-content>
+              <!-- Large Image Display -->
+              <div class="slideshow-image-container" *ngIf="slideshowImages.length > 0">
+                <div class="slideshow-image-wrapper" [class.presentation-mode]="isPresentationMode">
+                  <button mat-icon-button 
+                          class="nav-button prev-button" 
+                          (click)="navigateImage('prev')" 
+                          [disabled]="!canGoPrevious() || isSlideshowPlaying"
+                          *ngIf="slideshowImages.length > 1 && !isPresentationMode">
+                    <mat-icon>chevron_left</mat-icon>
+                  </button>
+                  
+                  <div class="main-image-display" [class.presentation-display]="isPresentationMode">
+                    <div *ngIf="!hasImageUrl(getCurrentSlideshowImage())" class="slideshow-loading">
+                      <mat-spinner diameter="50"></mat-spinner>
+                      <p>Loading images...</p>
+                    </div>
+                    <div class="image-with-filter-button" *ngIf="getCurrentSlideshowImage() && currentSlideshowIndex >= 0">
+                      <button mat-raised-button 
+                              color="primary" 
+                              class="filter-toggle-button"
+                              (click)="toggleFilters()">
+                        {{ filtersEnabled ? 'Original' : 'Enhanced' }}
+                      </button>
+                      
+                      <!-- Cross-fade presentation rendering -->
+                      <div class="presentation-slider" *ngIf="isPresentationMode">
+                        <img class="presentation-slide"
+                             [class.active]="presentationActiveLayer === 'a'"
+                             [src]="presentationLayerAUrl"
+                             [alt]="getCurrentSlideshowImage()"
+                             (error)="onImageError($event)"
+                             (load)="onImageLoad()"
+                             [style.filter]="getImageFilter()">
+                        <img class="presentation-slide"
+                             [class.active]="presentationActiveLayer === 'b'"
+                             [src]="presentationLayerBUrl"
+                             [alt]="getCurrentSlideshowImage()"
+                             (error)="onImageError($event)"
+                             (load)="onImageLoad()"
+                             [style.filter]="getImageFilter()">
+                      </div>
+
+                      <!-- Normal rendering -->
+                      <img *ngIf="!isPresentationMode"
+                           [src]="currentImageUrl" 
+                           [alt]="getCurrentSlideshowImage()"
+                           (error)="onImageError($event)"
+                           (load)="onImageLoad()"
+                           class="slideshow-main-image"
+                           [style.display]="currentImageUrl ? 'block' : 'none'"
+                           [style.filter]="getImageFilter()"
+                           [attr.data-index]="currentSlideshowIndex">
+                    </div>
+                    <p class="slideshow-timestamp" *ngIf="getCurrentSlideshowImage() && !isPresentationMode">
+                      {{ formatTimestamp(getCurrentSlideshowImage()) }}
+                    </p>
+                    <p class="slideshow-counter" *ngIf="slideshowImages.length > 0 && !isPresentationMode">
+                      Image {{ currentSlideshowIndex + 1 }} of {{ slideshowImages.length }}
+                    </p>
+                    
+                    <!-- Presentation Mode Controls -->
+                    <div class="presentation-controls" *ngIf="isPresentationMode">
+                      <div class="presentation-info">
+                        <p class="presentation-counter">{{ currentSlideshowIndex + 1 }} / {{ slideshowImages.length }}</p>
+                        <p class="presentation-timestamp">{{ formatTimestamp(getCurrentSlideshowImage()) }}</p>
+                      </div>
+                    </div>
+                    
+                    <!-- Play/Pause Button -->
+                    <button mat-fab 
+                            color="primary" 
+                            class="play-pause-button"
+                            (click)="toggleSlideshowPlay()"
+                            *ngIf="slideshowImages.length > 1"
+                            [matTooltip]="isSlideshowPlaying ? 'Pause' : 'Play'">
+                      <mat-icon>{{ isSlideshowPlaying ? 'pause' : 'play_arrow' }}</mat-icon>
+                    </button>
+                    
+                    <!-- Speed Controls -->
+                    <div class="speed-controls" *ngIf="slideshowImages.length > 1 && !isPresentationMode">
+                      <label class="speed-label">Speed:</label>
+                      <div class="speed-buttons">
+                        <button mat-mini-fab 
+                                *ngFor="let speed of availableSpeeds"
+                                [color]="slideshowSpeed === speed.value ? 'accent' : 'primary'"
+                                [class.active]="slideshowSpeed === speed.value"
+                                (click)="changeSlideshowSpeed(speed.value)"
+                                [matTooltip]="speed.label">
+                          {{ speed.label }}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <button mat-icon-button 
+                          class="nav-button next-button" 
+                          (click)="navigateImage('next')" 
+                          [disabled]="!canGoNext() || isSlideshowPlaying"
+                          *ngIf="slideshowImages.length > 1 && !isPresentationMode">
+                    <mat-icon>chevron_right</mat-icon>
+                  </button>
+                </div>
+
+                <!-- Presentation Mode Toggle + Presentation Speed (crossfade only) -->
+                <div class="presentation-mode-controls" *ngIf="slideshowImages.length > 1">
+                  <button mat-raised-button 
+                          [color]="isPresentationMode ? 'accent' : 'primary'"
+                          (click)="togglePresentationMode()"
+                          class="presentation-toggle-button">
+                    <mat-icon>{{ isPresentationMode ? 'fullscreen_exit' : 'presentation_mode' }}</mat-icon>
+                    <span>{{ isPresentationMode ? 'Exit Presentation' : 'Presentation Mode' }}</span>
+                  </button>
+                  
+                  <div class="speed-controls presentation-speed-controls" *ngIf="isPresentationMode">
+                    <label class="speed-label">Presentation speed:</label>
+                    <div class="speed-buttons">
+                      <button mat-mini-fab 
+                              *ngFor="let speed of availablePresentationSpeeds"
+                              [color]="presentationSpeed === speed.value ? 'accent' : 'primary'"
+                              [class.active]="presentationSpeed === speed.value"
+                              (click)="changePresentationSpeed(speed.value)"
+                              [matTooltip]="speed.label">
+                        {{ speed.label }}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Slider -->
+                <div class="slideshow-slider-container" *ngIf="slideshowImages.length > 1">
+                  <mat-slider 
+                    [min]="0" 
+                    [max]="slideshowImages.length - 1" 
+                    [step]="1" 
+                    [discrete]="true"
+                    (input)="onSlideshowSliderChange($event)"
+                    class="slideshow-slider">
+                    <input matSliderThumb [value]="currentSlideshowIndex" (input)="onSlideshowSliderChange($any($event.target).value)">
+                  </mat-slider>
+                  <div class="slider-labels">
+                    <span>First</span>
+                    <span>Last</span>
+                  </div>
+                </div>
+              </div>
+
+              <div *ngIf="slideshowImages.length === 0 && !loadingSlideshow" class="no-images-message">
+                <p>No images found for the selected time range.</p>
+              </div>
+            </mat-card-content>
+          </mat-card>
+        </div>
+      </div>
+    </mat-tab>
+
+    <!-- Tab 3: Image Comparison -->
+    <mat-tab label="Image Comparison">
+      <div class="tab-content">
+        <div class="comparison-controls">
+          <h3>Image Comparison</h3>
+          <p>Uses the same dates (Date 1 and Date 2) from the "Get Camera Pictures" tab above.</p>
+          <div class="form-group">
+            <button mat-raised-button color="primary" (click)="loadComparisonImages()" [disabled]="loadingComparison || !date1 || !date2">
+              <span *ngIf="loadingComparison">
+                <mat-spinner diameter="20" style="display: inline-block; margin-right: 8px;"></mat-spinner>
+                Loading...
+              </span>
+              <span *ngIf="!loadingComparison">Load Comparison Images</span>
+            </button>
+          </div>
+          <div *ngIf="selectedComparisonImage1 && selectedComparisonImage2" class="comparison-mode-selector">
+            <h4>Comparison Mode:</h4>
+            <div class="mode-buttons">
+              <button mat-raised-button 
+                      [color]="comparisonMode === 'slider' ? 'primary' : ''"
+                      (click)="comparisonMode = 'slider'">
+                Slider
+              </button>
+              <button mat-raised-button 
+                      [color]="comparisonMode === 'rectangle' ? 'primary' : ''"
+                      (click)="comparisonMode = 'rectangle'">
+                Rectangle Overlay
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div *ngIf="comparisonError" class="error-message">
+          <mat-card class="error-card">
+            <mat-card-content>
+              <strong>Error:</strong> {{ comparisonError }}
+            </mat-card-content>
+          </mat-card>
+        </div>
+
+        <div *ngIf="selectedComparisonImage1 && selectedComparisonImage2" class="comparison-container">
+          <mat-card>
+            <mat-card-header>
+              <mat-card-title>Image Comparison</mat-card-title>
+            </mat-card-header>
+            <mat-card-content>
+              <!-- Slider Mode -->
+              <div *ngIf="comparisonMode === 'slider'" class="comparison-image-wrapper" 
+                   (mousedown)="onComparisonDragStart($event)">
+                <!-- Filter Toggle Button -->
+                <button mat-raised-button 
+                        color="primary" 
+                        class="filter-toggle-button comparison-filter-button"
+                        (click)="toggleFilters()">
+                  {{ filtersEnabled ? 'Original' : 'Enhanced' }}
+                </button>
+                
+                <!-- Image 2 (top layer, will be clipped) -->
+                <div class="comparison-image-container image2-container" [style.clip-path]="getComparisonClipPath()">
+                  <img [src]="getImageUrlWithFetch(selectedComparisonImage2)" 
+                       [alt]="selectedComparisonImage2"
+                       (error)="onImageError($event)"
+                       class="comparison-image"
+                       [style.filter]="getImageFilter()"
+                       *ngIf="hasImageUrl(selectedComparisonImage2)">
+                  <div *ngIf="!hasImageUrl(selectedComparisonImage2)" class="comparison-loading">
+                    <mat-spinner diameter="50"></mat-spinner>
+                    <p>Loading image 2...</p>
+                  </div>
+                </div>
+
+                <!-- Image 1 (bottom layer) -->
+                <div class="comparison-image-container image1-container">
+                  <img [src]="getImageUrlWithFetch(selectedComparisonImage1)" 
+                       [alt]="selectedComparisonImage1"
+                       (error)="onImageError($event)"
+                       class="comparison-image"
+                       [style.filter]="getImageFilter()"
+                       *ngIf="hasImageUrl(selectedComparisonImage1)">
+                  <div *ngIf="!hasImageUrl(selectedComparisonImage1)" class="comparison-loading">
+                    <mat-spinner diameter="50"></mat-spinner>
+                    <p>Loading image 1...</p>
+                  </div>
+                </div>
+
+                <!-- Slider Line Indicator -->
+                <div class="comparison-slider-line" [style.left.%]="comparisonSliderValue"></div>
+              </div>
+
+              <!-- Rectangle Overlay Mode -->
+              <div *ngIf="comparisonMode === 'rectangle'" class="comparison-image-wrapper rectangle-mode">
+                <!-- Filter Toggle Button -->
+                <button mat-raised-button 
+                        color="primary" 
+                        class="filter-toggle-button comparison-filter-button"
+                        (click)="toggleFilters()">
+                  {{ filtersEnabled ? 'Original' : 'Enhanced' }}
+                </button>
+                
+                <!-- Image 1 (base layer) -->
+                <div class="comparison-image-container image1-container">
+                  <img [src]="getImageUrlWithFetch(selectedComparisonImage1)" 
+                       [alt]="selectedComparisonImage1"
+                       (error)="onImageError($event)"
+                       class="comparison-image"
+                       [style.filter]="getImageFilter()"
+                       *ngIf="hasImageUrl(selectedComparisonImage1)">
+                  <div *ngIf="!hasImageUrl(selectedComparisonImage1)" class="comparison-loading">
+                    <mat-spinner diameter="50"></mat-spinner>
+                    <p>Loading image 1...</p>
+                  </div>
+                </div>
+
+                <!-- Image 2 (full size, will be clipped to rectangle) -->
+                <div class="comparison-image-container image2-container rectangle-image2" 
+                     [style.clip-path]="getRectangleClipPath()">
+                  <img [src]="getImageUrlWithFetch(selectedComparisonImage2)" 
+                       [alt]="selectedComparisonImage2"
+                       (error)="onImageError($event)"
+                       class="comparison-image"
+                       [style.filter]="getImageFilter()"
+                       *ngIf="hasImageUrl(selectedComparisonImage2)">
+                  <div *ngIf="!hasImageUrl(selectedComparisonImage2)" class="comparison-loading">
+                    <mat-spinner diameter="50"></mat-spinner>
+                    <p>Loading image 2...</p>
+                  </div>
+                </div>
+
+                <!-- Rectangle Border/Handle -->
+                <div class="rectangle-overlay" 
+                     [style.left.%]="rectangleX"
+                     [style.top.%]="rectangleY"
+                     [style.width.px]="rectangleSize"
+                     [style.height.px]="rectangleSize"
+                     (mousedown)="onRectangleDragStart($event)">
+                  <div class="rectangle-border"></div>
+                </div>
+              </div>
+
+              <!-- Thumbnail Strips -->
+              <div class="comparison-thumbnails">
+                <!-- Image 1 Thumbnails -->
+                <div class="comparison-thumbnail-section">
+                  <h4>Image 1 - Date: {{ date1 }}</h4>
+                  <div class="thumbnail-strip-container">
+                    <div class="thumbnail-strip">
+                      <div *ngFor="let photo of comparisonImages1" 
+                           class="thumbnail-item"
+                           [class.selected]="selectedComparisonImage1 === photo"
+                           (click)="selectComparisonImage1(photo)">
+                        <img [src]="getImageUrlWithFetch(photo)" 
+                             [alt]="photo"
+                             (error)="onImageError($event)"
+                             class="thumbnail-image"
+                             *ngIf="hasImageUrl(photo)">
+                        <div *ngIf="!hasImageUrl(photo)" class="thumbnail-loading">
+                          <mat-spinner diameter="20"></mat-spinner>
+                        </div>
+                        <p class="thumbnail-timestamp">{{ formatTimestamp(photo) }}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Image 2 Thumbnails -->
+                <div class="comparison-thumbnail-section">
+                  <h4>Image 2 - Date: {{ date2 }}</h4>
+                  <div class="thumbnail-strip-container">
+                    <div class="thumbnail-strip">
+                      <div *ngFor="let photo of comparisonImages2" 
+                           class="thumbnail-item"
+                           [class.selected]="selectedComparisonImage2 === photo"
+                           (click)="selectComparisonImage2(photo)">
+                        <img [src]="getImageUrlWithFetch(photo)" 
+                             [alt]="photo"
+                             (error)="onImageError($event)"
+                             class="thumbnail-image"
+                             *ngIf="hasImageUrl(photo)">
+                        <div *ngIf="!hasImageUrl(photo)" class="thumbnail-loading">
+                          <mat-spinner diameter="20"></mat-spinner>
+                        </div>
+                        <p class="thumbnail-timestamp">{{ formatTimestamp(photo) }}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </mat-card-content>
+          </mat-card>
+        </div>
+      </div>
+    </mat-tab>
+
+    <!-- Tab 4: Generate Weekly Video -->
+    <mat-tab label="Generate Video">
+      <div class="tab-content">
+        <button mat-raised-button color="primary" (click)="generateWeeklyVideo()" [disabled]="loadingVideo">
+          <span *ngIf="loadingVideo">
+            <mat-spinner diameter="20" style="display: inline-block; margin-right: 8px;"></mat-spinner>
+            Generating...
+          </span>
+          <span *ngIf="!loadingVideo">Generate Weekly Video</span>
+        </button>
+
+        <div *ngIf="videoError" class="error-message">
+          <mat-card class="error-card">
+            <mat-card-content>
+              <strong>Error:</strong> {{ videoError }}
+            </mat-card-content>
+          </mat-card>
+        </div>
+
+        <div *ngIf="videoResponse" class="response-section">
+          <mat-card>
+            <mat-card-header>
+              <mat-card-title>Video Generated</mat-card-title>
+            </mat-card-header>
+            <mat-card-content>
+              <p><strong>Message:</strong> {{ videoResponse.message }}</p>
+              <p><strong>Video Path:</strong> {{ videoResponse.videoPath }}</p>
+              <button mat-raised-button color="accent" (click)="openVideo()" *ngIf="videoResponse.videoPath">
+                Open Video
+              </button>
+            </mat-card-content>
+          </mat-card>
+        </div>
+      </div>
+    </mat-tab>
+
+    <!-- Tab 5: Studio (Image Editor) -->
+    <mat-tab label="Studio">
+      <div class="tab-content">
+        <div class="studio-controls">
+          <h3>Image Studio</h3>
+          <p>Select an image to edit from the other tabs, or enter an image URL.</p>
+          <div class="form-group">
+            <mat-form-field appearance="outline">
+              <mat-label>Image URL</mat-label>
+              <input matInput [(ngModel)]="studioImageSrc" placeholder="Enter image URL or select from other tabs">
+            </mat-form-field>
+            <button mat-raised-button color="primary" (click)="loadImageForStudio()">
+              Load Image
+            </button>
+          </div>
+          <div class="form-group" style="margin-top: 16px;">
+            <h4 style="color: #ffffff; margin-bottom: 12px;">Get Image by Hour from Date 1</h4>
+            <mat-form-field appearance="outline">
+              <mat-label>Hour (0-23)</mat-label>
+              <input matInput type="number" [(ngModel)]="selectedHour" min="0" max="23" placeholder="12">
+            </mat-form-field>
+            <button mat-raised-button color="primary" (click)="getImageByHour()" [disabled]="!date1 || !picturesResponse">
+              Get Image at Hour {{ selectedHour }}
+            </button>
+          </div>
+          <div class="form-group" style="margin-top: 16px;">
+            <p>Quick Select:</p>
+            <button mat-raised-button (click)="setStudioImageFromSlideshow()" [disabled]="!getCurrentSlideshowImage()">
+              Use Current Slideshow Image
+            </button>
+            <button mat-raised-button (click)="setStudioImageFromComparison()" [disabled]="!selectedComparisonImage1">
+              Use Comparison Image 1
+            </button>
+            <button mat-raised-button (click)="setStudioImageFromDate1()" [disabled]="!selectedDate1Image">
+              Use Date 1 Selected Image
+            </button>
+            <button mat-raised-button (click)="setStudioImageFromDate2()" [disabled]="!selectedDate2Image">
+              Use Date 2 Selected Image
+            </button>
+          </div>
+        </div>
+
+        <div *ngIf="studioImageSrc" class="studio-wrapper">
+          <img [src]="studioImageSrc" alt="Studio Image" class="studio-preview-image" [style.filter]="getImageFilter()" style="max-width: 100%; max-height: 600px;">
+        </div>
+        <div *ngIf="!studioImageSrc" class="no-image-message">
+          <p>Please select or enter an image URL to start editing.</p>
+        </div>
+      </div>
+    </mat-tab>
+
+  </mat-tab-group>
+</div>

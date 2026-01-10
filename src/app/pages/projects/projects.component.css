@@ -1,8 +1,10 @@
 .projects-page {
-  padding: 0 120px;
-  background: linear-gradient(225deg, var(--gradient-start) 0%, var(--gradient-end) 25%);
+  display: flex;
+  flex-direction: column;
   min-height: calc(100vh - 80px);
   width: 100%;
+  background: linear-gradient(225deg, var(--gradient-start) 0%, var(--gradient-end) 25%);
+  position: relative;
 }
 
 /* Loading, Error, and Empty States */
@@ -33,34 +35,57 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-top: 32px;
-  margin-bottom: 2rem;
+  padding: 32px 120px 16px 120px;
+  background: #ffffff;
+  z-index: 10;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.breadcrumb-section {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
 .breadcrumb {
   display: flex;
+  gap: 4px;
   align-items: center;
-  gap: 8px;
-  font-size: 20px;
-  font-family: 'Inter', sans-serif;
-  line-height: 1.3;
 }
 
 .breadcrumb-logo {
-  height: 28px;
+  height: 32px;
   width: auto;
   object-fit: contain;
   cursor: pointer;
   transition: opacity 0.3s ease;
+  flex-shrink: 0;
 }
 
 .breadcrumb-logo:hover {
   opacity: 0.7;
 }
 
+.breadcrumb-logo.clickable {
+  cursor: pointer;
+}
+
+.breadcrumb-arrow {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
 .breadcrumb-item {
-  color: #202939;
-  font-weight: 400;
+  font-size: 16px;
+  font-weight: 600;
+  font-family: 'Inter', sans-serif;
+  color: #9aa4b2;
+  text-transform: uppercase;
+  line-height: normal;
 }
 
 .breadcrumb-item.clickable {
@@ -73,22 +98,8 @@
   text-decoration: underline;
 }
 
-.breadcrumb-separator {
-  color: #9aa4b2;
-  font-weight: 400;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 1px;
-  height: 20px;
-  background: #9aa4b2;
-  border: none;
-  padding: 0;
-}
-
 .breadcrumb-item.active {
   color: var(--primary-color);
-  font-weight: 600;
 }
 
 .view-toggle {
@@ -97,56 +108,93 @@
   border: 1px solid #9aa4b2;
   border-radius: 999px;
   overflow: hidden;
+  background: #ffffff;
+  padding: 2px;
 }
 
 .view-btn {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  padding: 4px 16px;
-  height: 32px;
-  border-radius: 0;
+  padding: 6px 20px;
+  min-width: 80px;
+  height: 28px;
   border: none;
-  border-right: 1px solid #9aa4b2;
-  background: #ffffff;
+  background: transparent;
   color: #4b5565;
   cursor: pointer;
   transition: all 0.3s ease;
   font-size: 14px;
   font-family: 'Inter', sans-serif;
-  font-weight: 400;
+  font-weight: 500;
   line-height: 1.5;
+  white-space: nowrap;
+  position: relative;
+}
+
+.view-btn:first-child {
+  border-top-left-radius: 999px;
+  border-bottom-left-radius: 999px;
 }
 
 .view-btn:last-child {
-  border-right: none;
+  border-top-right-radius: 999px;
+  border-bottom-right-radius: 999px;
 }
 
-.view-btn:hover {
+.view-btn:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1px;
+  height: 16px;
+  background: #9aa4b2;
+}
+
+.view-btn.active::after {
+  display: none;
+}
+
+.view-btn:hover:not(.active) {
   background: #f5f5f5;
 }
 
 .view-btn.active {
   background: var(--primary-color);
   color: #ffffff;
-  border-color: var(--primary-color);
+  border-color: transparent;
 }
 
 .view-btn.active:hover {
   background: var(--primary-color);
+  opacity: 0.9;
 }
 
-.view-icon {
-  font-size: 1rem;
+.view-label {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* List View */
+.content-scrollable {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0 120px 32px 120px;
+  background: linear-gradient(225deg, var(--gradient-start) 0%, var(--gradient-end) 25%);
 }
 
 .projects-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 1.5rem;
+  padding-top: 32px;
+  padding-bottom: 32px;
 }
 
-/* When inside overlay, use 3 columns */
 :host-context(.overlay-content) .projects-grid {
   grid-template-columns: repeat(3, 1fr);
   gap: 24px;
@@ -214,8 +262,6 @@
   order: 2;
 }
 
-/* Removed gradient from right side of project card */
-
 .card-image-container::after {
   content: '';
   position: absolute;
@@ -278,206 +324,116 @@
 }
 
 .progress-text {
-  font-size: 0.875rem;
-  color: #ffffff;
+  font-size: 11px;
   font-weight: 600;
+  color: #ffffff;
   font-family: 'Inter', sans-serif;
+  letter-spacing: 0.55px;
+  text-transform: uppercase;
 }
 
 .progress-bar-container {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 4px;
 }
 
 .progress-bar {
   width: 100%;
-  height: 3px;
-  background: #ffffff;
-  border-radius: 999px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
   overflow: hidden;
-  position: relative;
 }
 
 .progress-fill {
   height: 100%;
-  background: var(--primary-color);
-  border-radius: 999px;
+  background: #ffffff;
   transition: width 0.3s ease;
 }
 
 .progress-labels {
   display: flex;
   justify-content: space-between;
-  font-size: 0.6875rem;
-  color: #ffffff;
-  font-weight: 600;
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.8);
   font-family: 'Inter', sans-serif;
-  text-transform: uppercase;
-  letter-spacing: 0.55px;
-  margin-top: 0.25rem;
+  font-weight: 500;
 }
 
 .card-actions {
   display: flex;
-  justify-content: space-between;
-  padding: 0;
-  border-top: none;
-  position: relative;
-  z-index: 2;
+  gap: 8px;
+  justify-content: center;
+  padding-top: 8px;
   order: 3;
-  gap: 0;
 }
 
 .action-btn {
-  width: 28px;
-  height: 28px;
-  background: #fee2e2;
-  border-radius: 4px;
-  border: 1px solid #dc2626;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.3s ease;
+  width: 32px;
+  height: 32px;
+  border: 1px solid #e3e8ef;
+  border-radius: 8px;
+  background: #ffffff;
   cursor: pointer;
-  padding: 0;
+  transition: all 0.3s ease;
   position: relative;
 }
 
-.action-icon-img {
-  width: 18px;
-  height: 18px;
-  object-fit: contain;
-  transition: transform 0.3s ease, filter 0.3s ease;
-}
-
-/* Make timelapse and live icons larger to match visual size of other icons */
-.action-icon-img.timelapse-icon,
-.action-icon-img.live-icon {
-  width: 26px;
-  height: 26px;
-}
-
 .action-btn:hover {
-  background: #fecaca;
-  border-color: #b91c1c;
-}
-
-.action-btn:hover .action-icon-img {
-  transform: scale(1.1);
+  border-color: var(--primary-color);
+  background: #f6f2ff;
 }
 
 .action-btn.active {
-  background: #d1fae5;
-  border-color: #059669;
+  background: var(--primary-color);
+  border-color: var(--primary-color);
 }
 
-.action-btn.active .action-icon-img {
-  /* Convert icon to full black when active */
-  filter: brightness(0);
+.action-icon-img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
 }
 
-.action-btn.active:hover {
-  background: #a7f3d0;
-  border-color: #047857;
-}
-
-.action-btn.active:hover .action-icon-img {
-  /* Keep black on hover */
-  filter: brightness(0);
-}
-
-.active-indicator {
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  margin-bottom: 3px;
-  background: var(--primary-color-dark);
-  color: #ffffff;
-  padding: 8px;
-  border-radius: 10px;
-  white-space: nowrap;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  font-size: 14px;
-  line-height: 1.5;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-}
-
-.active-indicator::after {
-  content: '';
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  border: 13px solid transparent;
-  border-top-color: var(--primary-color-dark);
-  border-width: 13px 7px 0 7px;
-}
-
-.indicator-text {
-  font-weight: 600;
-  color: #ffffff;
-}
-
-.active-badge {
-  background: #00b330;
-  color: var(--primary-color-bg);
-  padding: 0 10px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 60px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.55px;
-  text-transform: uppercase;
-}
-
-/* Service Tooltip Styles (matching Figma design) */
 .service-tooltip {
   position: absolute;
-  top: 100%;
-  margin-top: 3px;
-  z-index: 10000;
+  bottom: calc(100% + 8px);
+  left: 0;
+  z-index: 1000;
   pointer-events: none;
-  /* Dynamic positioning will be set via ngStyle */
 }
 
 .tooltip-arrow {
   position: absolute;
-  bottom: 100%;
-  left: 0;
+  bottom: -4px;
+  left: 20px;
   width: 0;
   height: 0;
-  border-left: 7px solid transparent;
-  border-right: 7px solid transparent;
-  border-top: 13px solid #110038;
-  border-bottom: none;
-  z-index: 1;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 4px solid var(--primary-color);
 }
 
 .tooltip-content {
-  background: #110038;
+  background: var(--primary-color);
+  color: #ffffff;
+  padding: 8px 12px;
+  border-radius: 8px;
   display: flex;
-  gap: 14px;
+  gap: 8px;
   align-items: center;
-  padding: 8px;
-  border-radius: 10px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-  position: relative;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .tooltip-text {
+  font-size: 12px;
+  font-weight: 500;
   font-family: 'Inter', sans-serif;
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1.5;
-  color: #ffffff;
-  white-space: nowrap;
 }
 
 .tooltip-badge {
@@ -496,26 +452,21 @@
   white-space: nowrap;
 }
 
-.map-view {
+/* Map View - Created fresh with *ngIf, so it always has dimensions */
+.map-view-wrapper {
   width: 100%;
-  height: calc(100vh - 200px);
-  min-height: 500px;
+  padding: 24px 120px;
+  background: linear-gradient(225deg, var(--gradient-start) 0%, var(--gradient-end) 25%);
+  display: flex;
+  flex-direction: column;
   position: relative;
-  display: block;
-}
-
-.map-container {
-  width: 100%;
-  height: 100%;
-  border-radius: 8px;
-  overflow: hidden;
-  background: #e5e7eb;
+  min-height: 600px;
 }
 
 .map-theme-selector {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: 24px;
+  right: 120px;
   z-index: 1000;
   background: white;
   padding: 8px 12px;
@@ -552,6 +503,62 @@
 .theme-select:focus {
   border-color: var(--primary-color);
   box-shadow: 0 0 0 3px rgba(86, 33, 210, 0.1);
+}
+
+.map-container {
+  width: 100%;
+  height: calc(100vh - 200px);
+  min-height: 600px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #e5e7eb;
+  position: relative;
+  display: block;
+  box-sizing: border-box;
+}
+
+/* Map Markers */
+.custom-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+.map-marker {
+  position: relative;
+  width: 20px;
+  height: 20px;
+}
+
+.marker-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--primary-color);
+  border: 3px solid white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+}
+
+.camera-marker {
+  cursor: pointer;
+}
+
+.map-popup {
+  padding: 12px;
+  font-family: 'Inter', sans-serif;
+}
+
+.map-popup h3 {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #121926;
+}
+
+.map-popup p {
+  margin: 4px 0;
+  font-size: 14px;
+  color: #4b5565;
 }
 
 /* Camera Thumbnail Card Overlay */
@@ -660,213 +667,49 @@
   font-weight: 400;
   font-family: 'Inter', sans-serif;
   color: #5621d2;
-  line-height: 1.5;
   transition: all 0.3s ease;
 }
 
 .camera-thumbnail-card .quick-view-btn:hover {
   background: #f6f2ff;
+  border-color: var(--primary-color);
 }
 
 .camera-thumbnail-card .camera-details {
   display: flex;
-  gap: 12px;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .camera-thumbnail-card .detail-item {
-  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 4px;
 }
 
 .camera-thumbnail-card .detail-label {
-  font-size: 14px;
+  font-size: 11px;
   font-weight: 600;
   font-family: 'Inter', sans-serif;
-  color: #121926;
+  color: #9aa4b2;
+  text-transform: uppercase;
+  letter-spacing: 0.55px;
   margin: 0;
-  line-height: 1.5;
 }
 
 .camera-thumbnail-card .detail-value {
-  font-size: 13px;
-  font-weight: 400;
-  font-family: 'Inter', sans-serif;
-  color: #4b5565;
-  margin: 0;
-  line-height: 1.5;
-}
-
-.camera-thumbnail-card .view-details-btn {
-  width: 100%;
-  padding: 10px 16px;
-  height: 40px;
-  background: #5621d2;
-  border: none;
-  border-radius: 8px;
-  color: #ffffff;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
   font-family: 'Inter', sans-serif;
-  cursor: pointer;
-  transition: background 0.3s ease;
+  color: #121926;
+  margin: 0;
 }
 
-.camera-thumbnail-card .view-details-btn:hover {
-  background: #4a1bb8;
-}
-
-.camera-thumbnail-card .status-dot {
-  color: #00b330;
-  font-size: 16px;
-  line-height: 1;
-}
-
-.camera-thumbnail-card .status-dot.active {
+.status-dot {
+  font-size: 12px;
   color: #00b330;
 }
 
-/* Ensure Leaflet map container has proper styling */
-:host ::ng-deep .leaflet-container {
-  width: 100%;
-  height: 100%;
-  font-family: 'Inter', sans-serif;
-  background: #e5e7eb;
+.status-dot.active {
+  color: #00b330;
 }
-
-/* Fix for tile loading issues */
-:host ::ng-deep .leaflet-tile-container img {
-  max-width: none !important;
-  max-height: none !important;
-}
-
-:host ::ng-deep .leaflet-tile {
-  visibility: visible;
-  opacity: 1;
-}
-
-:host ::ng-deep .leaflet-control-zoom {
-  border: none;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-}
-
-:host ::ng-deep .leaflet-control-zoom a {
-  background-color: #ffffff;
-  color: #4b5565;
-  border: 1px solid #e5e7eb;
-}
-
-:host ::ng-deep .leaflet-control-zoom a:hover {
-  background-color: #f5f5f5;
-  color: #121926;
-}
-
-/* Custom marker styles */
-:host ::ng-deep .custom-marker {
-  background: transparent;
-  border: none;
-}
-
-.map-marker {
-  position: relative;
-  width: 20px;
-  height: 20px;
-}
-
-.marker-dot {
-  width: 20px;
-  height: 20px;
-  background: var(--primary-color);
-  border: 3px solid #ffffff;
-  border-radius: 50%;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-  cursor: pointer;
-  transition: transform 0.2s ease;
-}
-
-.marker-dot:hover {
-  transform: scale(1.2);
-}
-
-/* Map popup styles */
-:host ::ng-deep .leaflet-popup-content-wrapper {
-  border-radius: 8px;
-  padding: 0;
-}
-
-:host ::ng-deep .leaflet-popup-content {
-  margin: 0;
-  padding: 16px;
-  min-width: 200px;
-}
-
-.map-popup {
-  font-family: 'Inter', sans-serif;
-}
-
-.map-popup h3 {
-  margin: 0 0 8px 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: #121926;
-}
-
-.map-popup p {
-  margin: 4px 0;
-  font-size: 14px;
-  color: #4b5565;
-}
-
-.cameras-list {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid #e5e7eb;
-}
-
-.cameras-list h4 {
-  margin: 0 0 8px 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: #121926;
-}
-
-.cameras-list ul {
-  margin: 0;
-  padding-left: 20px;
-  list-style-type: disc;
-}
-
-.cameras-list li {
-  margin: 4px 0;
-  font-size: 13px;
-  color: #4b5565;
-}
-
-/* Camera marker styles */
-:host ::ng-deep .camera-marker {
-  background: transparent;
-  border: none;
-}
-
-.map-marker.camera {
-  position: relative;
-  width: 16px;
-  height: 16px;
-}
-
-.marker-dot.camera-dot {
-  width: 16px;
-  height: 16px;
-  background: #00b330;
-  border: 2px solid #ffffff;
-  border-radius: 50%;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-  cursor: pointer;
-  transition: transform 0.2s ease;
-}
-
-.marker-dot.camera-dot:hover {
-  transform: scale(1.3);
-}
-

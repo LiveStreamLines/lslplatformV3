@@ -1,4 +1,4 @@
-import { Component, Input, OnInit, OnChanges, AfterViewInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
+import { Component, Input, OnInit, OnChanges, AfterViewInit, OnDestroy, ViewChild, ElementRef, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, Router, ActivatedRoute } from '@angular/router';
@@ -23,7 +23,7 @@ export interface ProjectServiceStatus {
   live: boolean;
   drone: boolean;
   photography: boolean;
-  satellite: boolean; // Always false for now
+  satellite: boolean;
 }
 
 @Component({
@@ -42,31 +42,11 @@ export class ProjectsComponent implements OnInit, OnChanges, AfterViewInit, OnDe
   communityImage: string = '';
   
   icons = ICONS;
-  mapTheme: string = DEFAULT_MAP_THEME; // Current map theme
-  availableThemes = MAP_THEMES; // Available map themes
-  projects: Project[] = []; // Projects for current developer (for list view)
+  mapTheme: string = DEFAULT_MAP_THEME;
+  availableThemes = MAP_THEMES;
+  projects: Project[] = [];
   
-  // Get array of theme keys for iteration
-  getThemeKeys(): string[] {
-    return Object.keys(MAP_THEMES);
-  }
-  
-  // Method to change map theme
-  setMapTheme(themeKey: string) {
-    if (MAP_THEMES[themeKey]) {
-      this.mapTheme = themeKey;
-      // Reinitialize map with new theme if map is already initialized
-      if (this.map) {
-        this.map.remove();
-        this.map = null;
-        setTimeout(() => {
-          this.initMap();
-        }, 100);
-      }
-    }
-  }
-  allProjectsForMap: Project[] = []; // All projects from all developers (for map view)
-  projectCameras: Map<string, Camera[]> = new Map(); // Store cameras per project
+  projectCameras: Map<string, Camera[]> = new Map();
   projectServiceStatuses: Map<string, ProjectServiceStatus> = new Map();
   serviceConfig: ServiceConfig | null = null;
   isLoading = false;
@@ -78,7 +58,6 @@ export class ProjectsComponent implements OnInit, OnChanges, AfterViewInit, OnDe
   private markers: L.Marker[] = [];
   private cameraMarkers: L.Marker[] = [];
   
-  // Camera card overlay state
   selectedMapCamera: Camera | null = null;
   thumbnailCardPosition: { x: number; y: number } = { x: 0, y: 0 };
 
@@ -91,103 +70,58 @@ export class ProjectsComponent implements OnInit, OnChanges, AfterViewInit, OnDe
     private communitiesService: CommunitiesService,
     private camerasService: CamerasService,
     private cameraPicsService: CameraPicsService,
-    private cacheService: CameraPicsCacheService
+    private cacheService: CameraPicsCacheService,
+    private cdr: ChangeDetectorRef
   ) {}
 
-  toggleView(mode: 'list' | 'map') {
+  // Helper methods
+  isListView(): boolean {
+    return this.viewMode === 'list';
+  }
+  
+  isMapView(): boolean {
+    return this.viewMode === 'map';
+  }
+  
+  getThemeKeys(): string[] {
+    return Object.keys(MAP_THEMES);
+  }
+
+  toggleView(mode: 'list' | 'map'): void {
+    if (this.viewMode === mode) return;
+    
+    // Clean up map if switching away from map view
+    if (this.viewMode === 'map' && mode === 'list') {
+      this.cleanupMap();
+    }
+    
     this.viewMode = mode;
-    if (mode === 'map') {
-      // Initialize or resize map when switching to map view
+    this.cdr.detectChanges();
+    
+    // If switching to map view, initialize map after Angular renders the view
+    if (mode === 'map' && !this.map) {
+      // Wait for *ngIf to create the element and Angular to render it
       setTimeout(() => {
-        if (!this.map) {
-          this.initMap();
-        } else {
-          // Force resize multiple times to ensure proper rendering
-          setTimeout(() => {
-            this.map?.invalidateSize();
-            this.map?.eachLayer((layer) => {
-              if (layer instanceof L.TileLayer) {
-                (layer as L.TileLayer).redraw();
-              }
-            });
-            // Load cameras first, then update map
-            if (this.developerId && this.projects.length > 0) {
-              this.loadCamerasForProjects();
-            } else {
-              this.updateMap();
-            }
-          }, 100);
-          setTimeout(() => {
-            this.map?.invalidateSize();
-          }, 500);
+        this.initializeMap();
+      }, 100);
+    } else if (mode === 'map' && this.map) {
+      // Map already initialized, just invalidate size
+      setTimeout(() => {
+        if (this.map) {
+          this.map.invalidateSize(true);
         }
-      }, 200);
+      }, 100);
     }
-  }
-
-  /**
-   * Calculate project progress based on creation date
-   * Uses 3 years (1095 days) as total duration
-   */
-  private calculateProjectProgress(project: Project): { daysCompleted: number; totalDays: number } {
-    const THREE_YEARS_DAYS = 1095; // 3 years = 365 * 3 = 1095 days
-    const totalDays = THREE_YEARS_DAYS;
-
-    if (!project.createdDate) {
-      // If no creation date, return 0 progress
-      return { daysCompleted: 0, totalDays };
-    }
-
-    try {
-      // Parse creation date (assuming ISO format or YYYY-MM-DD)
-      const createdDate = new Date(project.createdDate);
-      const today = new Date();
-      
-      // Set time to midnight for accurate day calculation
-      today.setHours(0, 0, 0, 0);
-      createdDate.setHours(0, 0, 0, 0);
-
-      // Calculate days difference
-      const timeDiff = today.getTime() - createdDate.getTime();
-      const daysDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
-
-      // Days completed should be between 0 and totalDays
-      const daysCompleted = Math.max(0, Math.min(daysDiff, totalDays));
-
-      return { daysCompleted, totalDays };
-    } catch (error) {
-      console.error('Error calculating project progress for project:', project.id, error);
-      return { daysCompleted: 0, totalDays };
-    }
-  }
-
-  getProgressPercentage(daysCompleted: number = 0, totalDays: number = 0): number {
-    if (totalDays === 0) return 0;
-    const percentage = (daysCompleted / totalDays) * 100;
-    // Ensure percentage is between 0 and 100
-    return Math.max(0, Math.min(100, percentage));
-  }
-
-  navigateToProject(projectId: string) {
-    this.router.navigate(['/project', projectId]);
-  }
-
-  navigateToAllProjects() {
-    // Navigate to communities page to show all projects
-    this.router.navigate(['/communities']);
   }
 
   ngOnInit() {
-    // Initialize community image from selectedCategory if available
     if (this.selectedCategory) {
       this.communityImage = COMMUNITY_IMAGES[this.selectedCategory as keyof typeof COMMUNITY_IMAGES] || COMMUNITY_IMAGES['Dubai Hills Estate'] || '';
     }
     
-    // Check for developerId in route query params first, then use @Input
     this.route.queryParams.subscribe(params => {
       if (params['developerId']) {
         this.developerId = params['developerId'];
-        // Load community name for breadcrumb
         this.loadCommunityName();
         this.loadProjects();
       } else if (this.developerId) {
@@ -197,36 +131,42 @@ export class ProjectsComponent implements OnInit, OnChanges, AfterViewInit, OnDe
     });
   }
 
+  ngOnChanges() {
+    if (this.selectedCategory) {
+      this.communityImage = COMMUNITY_IMAGES[this.selectedCategory as keyof typeof COMMUNITY_IMAGES] || COMMUNITY_IMAGES['Dubai Hills Estate'] || '';
+    }
+    
+    if (this.developerId && !this.route.snapshot.queryParams['developerId']) {
+      this.loadCommunityName();
+      this.loadProjects();
+    }
+  }
+
+  ngAfterViewInit() {
+    // If default view is map, initialize it
+    if (this.viewMode === 'map') {
+      setTimeout(() => {
+        this.initializeMap();
+      }, 200);
+    }
+  }
+
+  ngOnDestroy() {
+    this.cleanupMap();
+  }
+
   private loadCommunityName() {
     if (this.developerId) {
       this.communitiesService.getCommunityById(this.developerId).subscribe({
         next: (community) => {
           this.selectedCategory = community.name;
-          // Load community image for breadcrumb logo
           this.communityImage = community.image || COMMUNITY_IMAGES[community.name as keyof typeof COMMUNITY_IMAGES] || COMMUNITY_IMAGES['Dubai Hills Estate'] || '';
         },
         error: (err) => {
           console.error('Error loading community name:', err);
-          // Fallback to default image based on selectedCategory
           this.communityImage = COMMUNITY_IMAGES[this.selectedCategory as keyof typeof COMMUNITY_IMAGES] || COMMUNITY_IMAGES['Dubai Hills Estate'] || '';
         }
       });
-    } else {
-      // Fallback to default image based on selectedCategory if no developerId
-      this.communityImage = COMMUNITY_IMAGES[this.selectedCategory as keyof typeof COMMUNITY_IMAGES] || COMMUNITY_IMAGES['Dubai Hills Estate'] || '';
-    }
-  }
-
-  ngOnChanges() {
-    // Load community image based on selectedCategory if it changes
-    if (this.selectedCategory) {
-      this.communityImage = COMMUNITY_IMAGES[this.selectedCategory as keyof typeof COMMUNITY_IMAGES] || COMMUNITY_IMAGES['Dubai Hills Estate'] || '';
-    }
-    
-    // Only load if developerId is provided via @Input (not from route)
-    if (this.developerId && !this.route.snapshot.queryParams['developerId']) {
-      this.loadCommunityName();
-      this.loadProjects();
     }
   }
 
@@ -239,7 +179,6 @@ export class ProjectsComponent implements OnInit, OnChanges, AfterViewInit, OnDe
     this.isLoading = true;
     this.error = null;
 
-    // Fetch both projects and service config in parallel
     forkJoin({
       projects: this.projectsService.getProjectsByDeveloperId(this.developerId),
       serviceConfig: this.serviceConfigService.getServiceConfig()
@@ -247,27 +186,21 @@ export class ProjectsComponent implements OnInit, OnChanges, AfterViewInit, OnDe
       next: ({ projects, serviceConfig }) => {
         this.serviceConfig = serviceConfig;
         
-        // Use project image or fallback to default, and calculate progress based on creation date
         this.projects = projects.map(project => {
-          const calculatedProgress = this.calculateProjectProgress(project);
+          const progress = this.calculateProjectProgress(project);
           return {
             ...project,
             image: project.image || PROJECT_IMAGE,
-            daysCompleted: calculatedProgress.daysCompleted,
-            totalDays: calculatedProgress.totalDays
+            daysCompleted: progress.daysCompleted,
+            totalDays: progress.totalDays
           };
         });
 
-        // Determine service statuses for each project
         this.updateProjectServiceStatuses();
-        
-        // Load cameras for all projects
         this.loadCamerasForProjects();
-        
         this.isLoading = false;
         
-        // Update map if in map view
-        if (this.viewMode === 'map') {
+        if (this.viewMode === 'map' && this.map) {
           setTimeout(() => this.updateMap(), 100);
         }
       },
@@ -280,6 +213,37 @@ export class ProjectsComponent implements OnInit, OnChanges, AfterViewInit, OnDe
     });
   }
 
+  private calculateProjectProgress(project: Project): { daysCompleted: number; totalDays: number } {
+    const THREE_YEARS_DAYS = 1095;
+    const totalDays = THREE_YEARS_DAYS;
+
+    if (!project.createdDate) {
+      return { daysCompleted: 0, totalDays };
+    }
+
+    try {
+      const createdDate = new Date(project.createdDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      createdDate.setHours(0, 0, 0, 0);
+
+      const timeDiff = today.getTime() - createdDate.getTime();
+      const daysDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+      const daysCompleted = Math.max(0, Math.min(daysDiff, totalDays));
+
+      return { daysCompleted, totalDays };
+    } catch (error) {
+      console.error('Error calculating project progress:', error);
+      return { daysCompleted: 0, totalDays };
+    }
+  }
+
+  getProgressPercentage(daysCompleted: number = 0, totalDays: number = 0): number {
+    if (totalDays === 0) return 0;
+    const percentage = (daysCompleted / totalDays) * 100;
+    return Math.max(0, Math.min(100, percentage));
+  }
+
   private updateProjectServiceStatuses() {
     if (!this.serviceConfig) return;
 
@@ -287,16 +251,102 @@ export class ProjectsComponent implements OnInit, OnChanges, AfterViewInit, OnDe
     
     this.projects.forEach(project => {
       const status: ProjectServiceStatus = {
-        timelapse: true, // All projects have timelapse active
+        timelapse: true,
         live: this.serviceConfigService.isServiceActive(project.projectTag, 'live', this.serviceConfig!),
         drone: this.serviceConfigService.isServiceActive(project.projectTag, 'drone', this.serviceConfig!),
         photography: this.serviceConfigService.isServiceActive(project.projectTag, 'photography', this.serviceConfig!),
-        satellite: false // Not implemented yet
+        satellite: false
       };
       this.projectServiceStatuses.set(project.id, status);
     });
   }
 
+  private loadCamerasForProjects() {
+    this.projectCameras.clear();
+    
+    const cameraRequests = this.projects.map(project => 
+      this.camerasService.getCamerasByProjectId(project.id).pipe(
+        map(cameras => ({ projectId: project.id, cameras })),
+        catchError(() => of({ projectId: project.id, cameras: [] }))
+      )
+    );
+
+    if (cameraRequests.length === 0) return;
+
+    forkJoin(cameraRequests).subscribe({
+      next: (results) => {
+        results.forEach(({ projectId, cameras }) => {
+          cameras.forEach(camera => {
+            if (camera.createdDate) {
+              camera.installedDate = this.formatDateString(camera.createdDate);
+            } else {
+              camera.installedDate = 'N/A';
+            }
+            camera.image = null;
+            camera.thumbnail = null;
+          });
+          this.projectCameras.set(projectId, cameras);
+          
+          const project = this.projects.find(p => p.id === projectId);
+          if (project) {
+            this.loadCameraImagesForProject(project, cameras);
+          }
+        });
+        
+        if (this.viewMode === 'map' && this.map) {
+          setTimeout(() => this.updateMap(), 100);
+        }
+      },
+      error: (err) => {
+        console.error('Error loading cameras:', err);
+      }
+    });
+  }
+
+  private loadCameraImagesForProject(project: Project, cameras: Camera[]) {
+    if (!project.developer || !project.projectTag) return;
+
+    this.http.get<{ developerTag: string }>(`${API_CONFIG.baseUrl}/api/developers/${project.developer}`).subscribe({
+      next: (developer) => {
+        const developerTag = developer.developerTag || '';
+        const projectTag = project.projectTag || '';
+
+          cameras.forEach(camera => {
+            const cameraId = camera.camera || camera.id;
+            
+            // Load image directly - getLastImageUrl returns Observable<string>
+            this.cameraPicsService.getLastImageUrl(developerTag, projectTag, cameraId).subscribe({
+              next: (imageUrl) => {
+                if (imageUrl) {
+                  camera.image = imageUrl;
+                  camera.thumbnail = imageUrl;
+                }
+              },
+              error: (err) => {
+                // Silently fail - camera image is optional
+              }
+            });
+          });
+      },
+      error: (err) => {
+        console.error('Error loading developer tag:', err);
+      }
+    });
+  }
+
+  private formatDateString(dateString: string): string {
+    try {
+      const date = new Date(dateString);
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}-${month}-${year}`;
+    } catch (error) {
+      return 'N/A';
+    }
+  }
+
+  // Service status methods
   getServiceStatus(projectId: string, service: keyof ProjectServiceStatus): boolean {
     const status = this.projectServiceStatuses.get(projectId);
     return status ? status[service] : false;
@@ -317,7 +367,6 @@ export class ProjectsComponent implements OnInit, OnChanges, AfterViewInit, OnDe
     event.stopPropagation();
     this.hoveredService = { projectId, service };
     
-    // Calculate and store tooltip position
     const style = this.getTooltipStyle(event);
     const key = `${projectId}-${service}`;
     this.tooltipPositions.set(key, style);
@@ -341,13 +390,8 @@ export class ProjectsComponent implements OnInit, OnChanges, AfterViewInit, OnDe
 
     const buttonRect = button.getBoundingClientRect();
     const cardRect = card.getBoundingClientRect();
-    
-    // Calculate button position relative to card
     const buttonLeftRelative = buttonRect.left - cardRect.left;
     const cardWidth = cardRect.width;
-    
-    // Position tooltip to start from the left edge of the button and extend to the right
-    // This ensures it always stays inside the card
     const leftPercent = (buttonLeftRelative / cardWidth) * 100;
     
     return {
@@ -361,268 +405,536 @@ export class ProjectsComponent implements OnInit, OnChanges, AfterViewInit, OnDe
     return this.tooltipPositions.get(key) || { left: '50%', transform: 'translateX(-50%)' };
   }
 
-  private loadCamerasForProjects() {
-    this.projectCameras.clear();
-    
-    // Load cameras for each project in parallel
-    const cameraRequests = this.projects.map(project => 
-      this.camerasService.getCamerasByProjectId(project.id).pipe(
-        map(cameras => ({ projectId: project.id, cameras }))
-      )
-    );
+  // Navigation methods
+  navigateToProject(projectId: string) {
+    this.router.navigate(['/project', projectId]);
+  }
 
-    if (cameraRequests.length === 0) {
+  navigateToAllProjects() {
+    this.router.navigate(['/communities']);
+  }
+
+  navigateToCamera(cameraId: string, event: Event) {
+    event.stopPropagation();
+    this.router.navigate(['/camera', cameraId]);
+  }
+
+  // Map methods
+  setMapTheme(themeKey: string) {
+    if (MAP_THEMES[themeKey]) {
+      this.mapTheme = themeKey;
+      if (this.map) {
+        this.map.remove();
+        this.map = null;
+        setTimeout(() => {
+          this.initializeMap();
+        }, 100);
+      }
+    }
+  }
+
+  /**
+   * Initialize the map - simple approach with *ngIf
+   * The map container only exists in DOM when isMapView() is true
+   * Since it's created fresh, it should have proper dimensions from CSS
+   */
+  private initializeMap(): void {
+    if (this.map) {
+      console.warn('Map already initialized!');
       return;
     }
 
-    forkJoin(cameraRequests).subscribe({
-      next: (results) => {
-        results.forEach(({ projectId, cameras }) => {
-          // Format installed dates and clear images initially
-          cameras.forEach(camera => {
-            if (camera.createdDate) {
-              camera.installedDate = this.formatDateString(camera.createdDate);
-            } else {
-              camera.installedDate = 'N/A';
-            }
-            camera.image = null;
-            camera.thumbnail = null;
-          });
-          this.projectCameras.set(projectId, cameras);
-          
-          // Load images for cameras in this project
-          const project = this.projects.find(p => p.id === projectId);
-          if (project) {
-            this.loadCameraImagesForProject(project, cameras);
-          }
-        });
-        
-        // Debug: Log all camera coordinates for current developer
-        console.log('=== DEBUG: Camera Coordinates for Current Developer ===');
-        const allCameraCoordinates: Array<{
-          developer: string;
-          project: string;
-          camera: string;
-          name: string;
-          lat: number | undefined;
-          lng: number | undefined;
-        }> = [];
+    if (!this.isMapView()) {
+      console.log('Not in map view, skipping initialization');
+      return;
+    }
 
-        this.projects.forEach(project => {
-          const cameras = this.projectCameras.get(project.id) || [];
-          cameras.forEach(camera => {
-            if (camera.lat !== undefined && camera.lng !== undefined) {
-              allCameraCoordinates.push({
-                developer: project.developer || 'Unknown',
-                project: project.name || project.id,
-                camera: camera.camera || camera.id,
-                name: camera.name || camera.camera || 'Camera',
-                lat: camera.lat,
-                lng: camera.lng
-              });
-            }
-          });
-        });
-
-        console.log(`Total cameras with coordinates: ${allCameraCoordinates.length}`);
-        console.table(allCameraCoordinates);
-        console.log('=== End Debug Info ===');
+    // Wait for Angular to render the map container (it's created by *ngIf)
+    // Use requestAnimationFrame to wait for browser to render
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const container = this.mapContainer?.nativeElement || document.querySelector('.map-container') as HTMLElement;
         
-        // Update map if in map view (cameras are now loaded)
-        if (this.viewMode === 'map' && this.map) {
+        if (!container) {
+          console.error('Map container not found! Element may not be rendered yet.');
+          // Retry once more after a longer delay
           setTimeout(() => {
-            this.updateMap();
-          }, 100);
-        }
-      },
-      error: (err) => {
-        console.error('Error loading cameras for projects:', err);
-      }
-    });
-  }
-
-  private loadAllCamerasForAllDevelopers() {
-    // Load all developers, then all their projects, then all cameras
-    this.communitiesService.getCommunities().subscribe({
-      next: (communities) => {
-        // Get all projects for all developers
-        const projectRequests = communities.map(community =>
-          this.projectsService.getProjectsByDeveloperId(community.id).pipe(
-            map(projects => ({ developerId: community.id, projects }))
-          )
-        );
-
-        if (projectRequests.length === 0) {
+            const retryContainer = this.mapContainer?.nativeElement || document.querySelector('.map-container') as HTMLElement;
+            if (retryContainer) {
+              this.createMap(retryContainer);
+            } else {
+              console.error('Map container still not found after retry!');
+            }
+          }, 300);
           return;
         }
 
-        forkJoin(projectRequests).subscribe({
-          next: (projectResults) => {
-            // Store all projects for map display
-            this.allProjectsForMap = [];
-            projectResults.forEach(({ projects }) => {
-              this.allProjectsForMap.push(...projects);
-            });
-
-            const cameraRequests = this.allProjectsForMap.map(project =>
-              this.camerasService.getCamerasByProjectId(project.id).pipe(
-                map(cameras => ({ projectId: project.id, cameras })),
-                catchError(() => of({ projectId: project.id, cameras: [] })) // Handle errors gracefully
-              )
-            );
-
-            if (cameraRequests.length === 0) {
-              return;
-            }
-
-            forkJoin(cameraRequests).subscribe({
-              next: (cameraResults) => {
-                cameraResults.forEach(({ projectId, cameras }) => {
-                  this.projectCameras.set(projectId, cameras);
-                });
-
-                // Debug: Log all camera coordinates
-                console.log('=== DEBUG: All Camera Coordinates ===');
-                const allCameraCoordinates: Array<{
-                  developer: string;
-                  project: string;
-                  camera: string;
-                  name: string;
-                  lat: number | undefined;
-                  lng: number | undefined;
-                }> = [];
-
-                this.allProjectsForMap.forEach(project => {
-                  const cameras = this.projectCameras.get(project.id) || [];
-                  cameras.forEach(camera => {
-                    if (camera.lat !== undefined && camera.lng !== undefined) {
-                      allCameraCoordinates.push({
-                        developer: project.developer || 'Unknown',
-                        project: project.name || project.id,
-                        camera: camera.camera || camera.id,
-                        name: camera.name || camera.camera || 'Camera',
-                        lat: camera.lat,
-                        lng: camera.lng
-                      });
-                    }
-                  });
-                });
-
-                console.log(`Total cameras with coordinates: ${allCameraCoordinates.length}`);
-                console.table(allCameraCoordinates);
-                console.log('=== End Debug Info ===');
-
-                // Update map if in map view
-                if (this.viewMode === 'map' && this.map) {
-                  this.updateMap();
-                }
-              },
-              error: (err) => {
-                console.error('Error loading cameras for all projects:', err);
-              }
-            });
-          },
-          error: (err) => {
-            console.error('Error loading projects for all developers:', err);
-          }
-        });
-      },
-      error: (err) => {
-        console.error('Error loading all developers:', err);
-      }
+        // Container exists, wait a bit for flex layout to calculate dimensions
+        setTimeout(() => {
+          this.createMap(container);
+        }, 50);
+      });
     });
   }
 
-  ngAfterViewInit() {
-    // Initialize map when view is ready
-    if (this.viewMode === 'map') {
-      setTimeout(() => this.initMap(), 300);
-    }
-  }
-
-  ngOnDestroy() {
-    // Clean up map when component is destroyed
+  /**
+   * Actually create the Leaflet map instance
+   * Container is created fresh by *ngIf, so it should have dimensions from CSS flex layout
+   */
+  private createMap(container: HTMLElement): void {
     if (this.map) {
-      this.map.remove();
-      this.map = null;
+      console.warn('Map already exists!');
+      return;
     }
+
+    // Check dimensions - with *ngIf and flex layout, container should have dimensions
+    let width = container.offsetWidth || container.clientWidth || 0;
+    let height = container.offsetHeight || container.clientHeight || 0;
+
+    console.log('Creating map - initial container dimensions:', width, 'x', height);
+
+    // If dimensions are 0, wait for flex layout to calculate
+    if (!width || !height) {
+      console.warn('Container has 0 dimensions, waiting for flex layout...');
+      
+      // Wait a bit more for flex layout to calculate
+      setTimeout(() => {
+        width = container.offsetWidth || container.clientWidth || 0;
+        height = container.offsetHeight || container.clientHeight || 0;
+        
+        console.log('After wait - container dimensions:', width, 'x', height);
+
+        // If still 0, calculate from viewport and set explicit dimensions
+        if (!width || !height) {
+          const viewportHeight = window.innerHeight - 80;
+          const viewportWidth = window.innerWidth;
+          const header = document.querySelector('.page-header') as HTMLElement;
+          const headerHeight = header ? header.offsetHeight : 100;
+          
+          const calculatedHeight = Math.max(600, viewportHeight - headerHeight - 48);
+          const calculatedWidth = viewportWidth - 240;
+
+          console.warn('Container still has 0 dimensions! Setting explicit dimensions:', calculatedWidth, 'x', calculatedHeight);
+
+          // Set explicit dimensions on both wrapper and container
+          const wrapper = container.closest('.map-view-wrapper') as HTMLElement;
+          if (wrapper) {
+            wrapper.style.height = (viewportHeight - headerHeight) + 'px';
+            wrapper.style.minHeight = '600px';
+          }
+          
+          container.style.height = calculatedHeight + 'px';
+          container.style.width = calculatedWidth + 'px';
+          container.style.minHeight = calculatedHeight + 'px';
+          
+          // Force reflow
+          container.offsetHeight;
+          wrapper?.offsetHeight;
+          container.getBoundingClientRect();
+          
+          // Re-check dimensions
+          width = container.offsetWidth || container.clientWidth || calculatedWidth;
+          height = container.offsetHeight || container.clientHeight || calculatedHeight;
+          
+          console.log('After explicit dimensions - actual:', width, 'x', height);
+        }
+
+        // Proceed with initialization (use calculated dimensions as fallback if needed)
+        const finalWidth = width || (window.innerWidth - 240);
+        const finalHeight = height || Math.max(600, window.innerHeight - 100 - 48);
+        
+        this.initializeLeafletMap(container, finalWidth, finalHeight);
+      }, 200);
+      return;
+    }
+
+    // Dimensions are valid, initialize immediately
+    this.initializeLeafletMap(container, width, height);
   }
 
-  private initMap() {
-    if (!this.mapContainer?.nativeElement || this.map) {
+  /**
+   * Initialize Leaflet map with verified dimensions
+   * Use ResizeObserver to wait for actual dimensions before initializing
+   */
+  private initializeLeafletMap(container: HTMLElement, width: number, height: number): void {
+    if (this.map) {
+      console.warn('Map already exists!');
       return;
     }
 
-    const container = this.mapContainer.nativeElement;
-    
-    // Ensure container has dimensions
-    if (container.offsetWidth === 0 || container.offsetHeight === 0) {
-      console.warn('Map container has no dimensions, retrying...');
-      setTimeout(() => this.initMap(), 200);
-      return;
-    }
+    console.log('Initializing Leaflet map with expected dimensions:', width, 'x', height);
 
-    // Fix Leaflet default icon issue
+    // Fix Leaflet icons
     this.fixLeafletIcons();
 
     // Default center (Dubai)
     const defaultCenter: L.LatLngExpression = [25.2048, 55.2708];
     const defaultZoom = 11;
 
+    // Use ResizeObserver to wait for container to actually have dimensions
+    // This is the most reliable way to ensure dimensions before L.map()
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const actualWidth = entry.contentRect.width;
+        const actualHeight = entry.contentRect.height;
+        
+        console.log('ResizeObserver detected dimensions:', actualWidth, 'x', actualHeight);
+        console.log('Container offsetWidth/offsetHeight:', container.offsetWidth, 'x', container.offsetHeight);
+        
+        // If we have valid dimensions, initialize the map
+        if (actualWidth > 0 && actualHeight > 0) {
+          // Disconnect observer since we got dimensions
+          resizeObserver.disconnect();
+          
+          // Double-check offsetWidth/offsetHeight (Leaflet reads these)
+          const offsetWidth = container.offsetWidth || container.clientWidth || actualWidth;
+          const offsetHeight = container.offsetHeight || container.clientHeight || actualHeight;
+          
+          console.log('✓ Got valid dimensions! Initializing Leaflet map with:', offsetWidth, 'x', offsetHeight);
+          
+          // Initialize map NOW
+          this.createLeafletInstance(container, offsetWidth, offsetHeight, defaultCenter, defaultZoom);
+          return;
+        } else if (actualWidth === 0 && actualHeight === 0) {
+          // Still 0, but observer is watching - it will fire again when dimensions change
+          console.log('Container still has 0 dimensions, ResizeObserver will fire again when dimensions change...');
+        }
+      }
+    });
+
+    // Observe the container for size changes
+    resizeObserver.observe(container);
+    
+    // Also check dimensions immediately in case they're already valid
+    const immediateWidth = container.offsetWidth || container.clientWidth || 0;
+    const immediateHeight = container.offsetHeight || container.clientHeight || 0;
+    
+    console.log('Immediate check - container dimensions:', immediateWidth, 'x', immediateHeight);
+
+    if (immediateWidth > 0 && immediateHeight > 0) {
+      // Already have dimensions! Disconnect observer and initialize immediately
+      resizeObserver.disconnect();
+      console.log('✓ Container already has valid dimensions! Initializing immediately...');
+      this.createLeafletInstance(container, immediateWidth, immediateHeight, defaultCenter, defaultZoom);
+      return;
+    }
+
+    // If dimensions are 0, set explicit dimensions to trigger ResizeObserver
+    console.warn('Container has 0 dimensions, setting explicit dimensions to trigger ResizeObserver...');
+    
+    const viewportHeight = window.innerHeight - 80;
+    const viewportWidth = window.innerWidth;
+    const header = document.querySelector('.page-header') as HTMLElement;
+    const headerHeight = header ? header.offsetHeight : 100;
+    
+    const calculatedHeight = Math.max(600, viewportHeight - headerHeight - 48);
+    const calculatedWidth = viewportWidth - 240;
+
+    // Set explicit dimensions on wrapper and container
+    const wrapper = container.closest('.map-view-wrapper') as HTMLElement;
+    if (wrapper) {
+      wrapper.style.height = (viewportHeight - headerHeight) + 'px';
+      wrapper.style.minHeight = '600px';
+    }
+    
+    container.style.height = calculatedHeight + 'px';
+    container.style.width = calculatedWidth + 'px';
+    container.style.minHeight = calculatedHeight + 'px';
+    
+    // Force reflow to ensure dimensions are applied
+    container.offsetHeight;
+    wrapper?.offsetHeight;
+    container.getBoundingClientRect();
+    
+    // Wait a bit, then check again
+    setTimeout(() => {
+      const afterWaitWidth = container.offsetWidth || container.clientWidth || 0;
+      const afterWaitHeight = container.offsetHeight || container.clientHeight || 0;
+      
+      console.log('After setting dimensions and waiting - container dimensions:', afterWaitWidth, 'x', afterWaitHeight);
+      
+      if (afterWaitWidth > 0 && afterWaitHeight > 0) {
+        // Got dimensions! Disconnect observer and initialize
+        resizeObserver.disconnect();
+        console.log('✓ Container now has dimensions! Initializing Leaflet map...');
+        this.createLeafletInstance(container, afterWaitWidth, afterWaitHeight, defaultCenter, defaultZoom);
+      } else {
+        // Still 0, but ResizeObserver is watching - it will fire when dimensions become available
+        // Set a timeout to disconnect observer if it takes too long
+        setTimeout(() => {
+          resizeObserver.disconnect();
+          // Proceed with calculated dimensions as last resort
+          console.error('Timeout: Container still has 0 dimensions after 2 seconds!');
+          console.error('Proceeding with calculated dimensions as last resort...');
+          this.createLeafletInstance(container, calculatedWidth, calculatedHeight, defaultCenter, defaultZoom);
+        }, 2000);
+      }
+    }, 300);
+  }
+
+  /**
+   * Actually call L.map() and create the map instance
+   */
+  private createLeafletInstance(
+    container: HTMLElement,
+    width: number,
+    height: number,
+    center: L.LatLngExpression,
+    zoom: number
+  ): void {
     try {
-      // Initialize map
+      // Create the map with scroll wheel zoom enabled
       this.map = L.map(container, {
-        center: defaultCenter,
-        zoom: defaultZoom,
+        center: center,
+        zoom: zoom,
         zoomControl: true,
-        preferCanvas: false
+        preferCanvas: false,
+        scrollWheelZoom: true,
+        doubleClickZoom: true,
+        dragging: true,
+        touchZoom: true
       });
 
-      // Add map tiles based on selected theme
-      const theme = MAP_THEMES[this.mapTheme] || MAP_THEMES[DEFAULT_MAP_THEME];
-      const tileLayer = L.tileLayer(theme.url, {
-        attribution: theme.attribution,
-        maxZoom: theme.maxZoom || 19,
-        crossOrigin: true
-      });
+      console.log('Leaflet map created. Map size:', this.map.getSize());
+      console.log('Container dimensions after L.map():', container.offsetWidth, 'x', container.offsetHeight);
 
-      // Handle tile loading errors
-      tileLayer.on('tileerror', (error: any) => {
-        console.warn('Tile loading error:', error);
-        // Retry loading the tile
-        setTimeout(() => {
-          tileLayer.redraw();
-        }, 1000);
-      });
+      // Add tiles
+      this.addTiles();
 
-      tileLayer.addTo(this.map);
-
-      // Force tile reload after map is ready
-      this.map.whenReady(() => {
-        setTimeout(() => {
-          this.map?.invalidateSize();
-          tileLayer.redraw();
-        }, 300);
-      });
-
-      // Wait a bit for tiles to load, then update with markers
+      // Add markers after a short delay
       setTimeout(() => {
         this.updateMap();
-        // Invalidate size multiple times to ensure proper rendering
-        setTimeout(() => {
-          this.map?.invalidateSize();
-        }, 100);
-        setTimeout(() => {
-          this.map?.invalidateSize();
-        }, 500);
-      }, 200);
+        // Invalidate size after markers are added
+        if (this.map) {
+          this.map.invalidateSize(true);
+        }
+      }, 300);
+
+      // Handle map ready event
+      this.map.whenReady(() => {
+        console.log('Map ready - size:', this.map?.getSize());
+        if (this.map) {
+          // If map size is 0, fix it
+          const mapSize = this.map.getSize();
+          if (mapSize.x === 0 || mapSize.y === 0) {
+            console.error('Map initialized with 0 size! Fixing...');
+            
+            // Set explicit dimensions on container
+            container.style.height = height + 'px';
+            container.style.width = width + 'px';
+            
+            // Force reflow
+            container.offsetHeight;
+            
+            // Invalidate size
+            setTimeout(() => {
+              if (this.map) {
+                this.map.invalidateSize(true);
+                console.log('After invalidateSize - Map size:', this.map.getSize());
+              }
+            }, 100);
+          }
+        }
+      });
     } catch (error) {
-      console.error('Error initializing map:', error);
+      console.error('Error creating Leaflet instance:', error);
+      this.map = null;
+    }
+  }
+
+  /**
+   * Add tiles to the map
+   */
+  private addTiles(): void {
+    if (!this.map) return;
+
+    const theme = MAP_THEMES[this.mapTheme] || MAP_THEMES[DEFAULT_MAP_THEME];
+    const tileLayer = L.tileLayer(theme.url, {
+      attribution: theme.attribution,
+      maxZoom: theme.maxZoom || 19,
+      crossOrigin: true
+    });
+
+    tileLayer.on('tileerror', (error: any) => {
+      console.warn('Tile loading error:', error);
+      setTimeout(() => {
+        tileLayer.redraw();
+      }, 1000);
+    });
+
+    tileLayer.addTo(this.map);
+  }
+
+  /**
+   * Update map with markers
+   */
+  private updateMap(): void {
+    if (!this.map) {
+      console.warn('Map not initialized, cannot update markers');
+      return;
+    }
+
+    // Clear existing markers
+    this.markers.forEach(marker => marker.remove());
+    this.markers = [];
+    this.cameraMarkers.forEach(marker => marker.remove());
+    this.cameraMarkers = [];
+
+    const parseCoordinate = (coord: number | string | undefined): number | null => {
+      if (coord === undefined || coord === null) return null;
+      const parsed = typeof coord === 'string' ? parseFloat(coord) : coord;
+      if (isNaN(parsed) || parsed === 0) return null;
+      return parsed;
+    };
+
+    const isValidCoordinate = (lat: number | string | undefined, lng: number | string | undefined): boolean => {
+      const parsedLat = parseCoordinate(lat);
+      const parsedLng = parseCoordinate(lng);
+      return parsedLat !== null && parsedLng !== null;
+    };
+
+    // Add project markers
+    const bounds: L.LatLngExpression[] = [];
+    const projectsWithCoords = this.projects.filter(p => isValidCoordinate(p.lat, p.lng));
+
+    projectsWithCoords.forEach(project => {
+      const lat = parseCoordinate(project.lat!)!;
+      const lng = parseCoordinate(project.lng!)!;
+      const position: L.LatLngExpression = [lat, lng];
+      bounds.push(position);
+
+      const icon = L.divIcon({
+        className: 'custom-marker',
+        html: `<div class="map-marker"><div class="marker-dot"></div></div>`,
+        iconSize: [20, 20],
+        iconAnchor: [10, 20]
+      });
+
+      const popupContent = `
+        <div class="map-popup">
+          <h3>${project.name}</h3>
+          <p>Status: ${project.status || 'N/A'}</p>
+          <p>Days Completed: ${project.daysCompleted || 0} / ${project.totalDays || 0}</p>
+        </div>
+      `;
+
+      const marker = L.marker(position, { icon, title: project.name })
+        .addTo(this.map!)
+        .bindTooltip(project.name, {
+          permanent: false,
+          direction: 'top',
+          offset: [0, -10]
+        })
+        .bindPopup(popupContent);
+
+      marker.on('click', () => {
+        this.navigateToProject(project.id);
+      });
+
+      this.markers.push(marker);
+    });
+
+    // Add camera markers
+    this.projects.forEach(project => {
+      const cameras = this.projectCameras.get(project.id) || [];
+      
+      cameras.forEach(camera => {
+        const cameraLat = parseCoordinate(camera.lat);
+        const cameraLng = parseCoordinate(camera.lng);
+        
+        if (cameraLat !== null && cameraLng !== null) {
+          const cameraPosition: L.LatLngExpression = [cameraLat, cameraLng];
+          bounds.push(cameraPosition);
+
+          const cameraIcon = L.divIcon({
+            className: 'custom-marker camera-marker',
+            html: `<div style="background: #00b330; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3); cursor: pointer;"></div>`,
+            iconSize: [20, 20],
+            iconAnchor: [10, 20]
+          });
+
+          const cameraName = camera.name || camera.camera || 'Camera';
+          
+          const cameraMarker = L.marker(cameraPosition, { 
+            icon: cameraIcon,
+            title: cameraName
+          }).addTo(this.map!);
+
+          cameraMarker.on('mouseover', () => {
+            this.onMapCameraHover(camera, cameraLat, cameraLng);
+          });
+
+          cameraMarker.on('mouseout', () => {
+            this.selectedMapCamera = null;
+          });
+
+          cameraMarker.on('click', () => {
+            this.navigateToCamera(camera.id, new Event('click'));
+          });
+
+          this.cameraMarkers.push(cameraMarker);
+        }
+      });
+    });
+
+    // Fit map to bounds
+    if (bounds.length > 0) {
+      this.map.fitBounds(bounds as L.LatLngBoundsExpression, { padding: [50, 50] });
+    } else {
+      this.map.setView([25.2048, 55.2708], 13);
+    }
+    
+    console.log(`Map updated: ${this.markers.length} project markers, ${this.cameraMarkers.length} camera markers`);
+    
+    // Ensure map size is correct
+    setTimeout(() => {
+      if (this.map) {
+        this.map.invalidateSize(true);
+      }
+    }, 200);
+  }
+
+  private onMapCameraHover(camera: Camera, lat: number, lng: number) {
+    this.selectedMapCamera = camera;
+    
+    if (!camera.image) {
+      const project = this.projects.find(p => {
+        const cameras = this.projectCameras.get(p.id) || [];
+        return cameras.some(c => c.id === camera.id);
+      });
+      
+      if (project && project.developer && project.projectTag) {
+        this.http.get<{ developerTag: string }>(`${API_CONFIG.baseUrl}/api/developers/${project.developer}`).subscribe({
+          next: (developer) => {
+            const developerTag = developer.developerTag || '';
+            const projectTag = project.projectTag || '';
+            const cameraId = camera.camera || camera.id;
+            
+            this.cameraPicsService.getLastImageUrl(developerTag, projectTag, cameraId).subscribe({
+              next: (imageUrl) => {
+                if (imageUrl) {
+                  camera.image = imageUrl;
+                  camera.thumbnail = imageUrl;
+                }
+              },
+              error: () => {}
+            });
+          },
+          error: () => {}
+        });
+      }
+    }
+    
+    if (this.map) {
+      const point = this.map.latLngToContainerPoint([lat, lng]);
+      this.thumbnailCardPosition = {
+        x: Math.max(20, point.x - 320),
+        y: Math.max(20, point.y - 200)
+      };
     }
   }
 
   private fixLeafletIcons() {
-    // Fix Leaflet default icon paths - use CDN as fallback
     delete (L.Icon.Default.prototype as any)._getIconUrl;
     L.Icon.Default.mergeOptions({
       iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
@@ -631,364 +943,14 @@ export class ProjectsComponent implements OnInit, OnChanges, AfterViewInit, OnDe
     });
   }
 
-  private updateMap() {
-    if (!this.map) {
-      if (this.viewMode === 'map') {
-        this.initMap();
-      }
-      return;
-    }
-
-    console.log('=== DEBUG: updateMap called ===');
-    console.log('Projects count:', this.projects.length);
-    console.log('Project cameras map size:', this.projectCameras.size);
-
-    // Clear existing markers
-    this.markers.forEach(marker => marker.remove());
-    this.markers = [];
-    this.cameraMarkers.forEach(marker => marker.remove());
-    this.cameraMarkers = [];
-
-    // Helper function to parse coordinates (handles both string and number)
-    const parseCoordinate = (coord: number | string | undefined): number | null => {
-      if (coord === undefined || coord === null) return null;
-      const parsed = typeof coord === 'string' ? parseFloat(coord) : coord;
-      if (isNaN(parsed) || parsed === 0) return null; // Filter out 0,0 and invalid
-      return parsed;
-    };
-
-    // Helper function to check if coordinates are valid
-    const isValidCoordinate = (lat: number | string | undefined, lng: number | string | undefined): boolean => {
-      const parsedLat = parseCoordinate(lat);
-      const parsedLng = parseCoordinate(lng);
-      return parsedLat !== null && parsedLng !== null;
-    };
-
-    // Filter projects with valid coordinates
-    const projectsWithCoords = this.projects.filter(p => isValidCoordinate(p.lat, p.lng));
-
-    console.log('Projects with coordinates:', projectsWithCoords.length);
-    projectsWithCoords.forEach(p => {
-      console.log(`Project: ${p.name}, lat: ${p.lat}, lng: ${p.lng}`);
-    });
-
-    // Create markers for each project (if they have coordinates)
-    const bounds: L.LatLngBoundsExpression = [];
-    
-    projectsWithCoords.forEach(project => {
-      const lat = parseCoordinate(project.lat!)!;
-      const lng = parseCoordinate(project.lng!)!;
-      const position: L.LatLngExpression = [lat, lng];
-      
-      bounds.push(position);
-
-      // Create custom icon
-      const icon = L.divIcon({
-        className: 'custom-marker',
-        html: `<div class="map-marker">
-          <div class="marker-dot"></div>
-        </div>`,
-        iconSize: [20, 20],
-        iconAnchor: [10, 20]
-      });
-
-      // Get cameras for this project
-      const cameras = this.projectCameras.get(project.id) || [];
-      const camerasWithCoords = cameras.filter(c => isValidCoordinate(c.lat, c.lng));
-      
-      // Create cameras list HTML
-      let camerasHtml = '';
-      if (camerasWithCoords.length > 0) {
-        camerasHtml = '<div class="cameras-list"><h4>Cameras:</h4><ul>';
-        camerasWithCoords.forEach(camera => {
-          const lat = parseCoordinate(camera.lat!)!;
-          const lng = parseCoordinate(camera.lng!)!;
-          camerasHtml += `<li>${camera.name || camera.camera || 'Camera'}: ${lat.toFixed(6)}, ${lng.toFixed(6)}</li>`;
-        });
-        camerasHtml += '</ul></div>';
-      }
-
-      // Create popup content
-      const popupContent = `
-        <div class="map-popup">
-          <h3>${project.name}</h3>
-          <p>Status: ${project.status || 'N/A'}</p>
-          <p>Days Completed: ${project.daysCompleted || 0} / ${project.totalDays || 0}</p>
-          ${camerasHtml}
-        </div>
-      `;
-
-      // Create marker with tooltip
-      const marker = L.marker(position, { 
-        icon,
-        title: project.name // Tooltip on hover
-      })
-        .addTo(this.map!)
-        .bindTooltip(project.name, {
-          permanent: false, // Show on hover
-          direction: 'top',
-          offset: [0, -10]
-        })
-        .bindPopup(popupContent);
-
-      // Add click handler to navigate to project
-      marker.on('click', () => {
-        this.navigateToProject(project.id);
-      });
-
-      this.markers.push(marker);
-    });
-
-    // Add camera markers for ALL projects (even if project doesn't have coordinates)
-    this.projects.forEach(project => {
-      const cameras = this.projectCameras.get(project.id) || [];
-      
-      cameras.forEach(camera => {
-        const cameraLat = parseCoordinate(camera.lat);
-        const cameraLng = parseCoordinate(camera.lng);
-        
-        console.log(`Camera: ${camera.name || camera.camera}, Original lat: ${camera.lat}, lng: ${camera.lng}, Parsed lat: ${cameraLat}, lng: ${cameraLng}`);
-        
-        if (cameraLat !== null && cameraLng !== null) {
-          const cameraPosition: L.LatLngExpression = [cameraLat, cameraLng];
-          bounds.push(cameraPosition);
-
-          // Use a simple, visible marker for debugging - green circle
-          const cameraIcon = L.divIcon({
-            className: 'custom-marker camera-marker',
-            html: `<div style="background: #00b330; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3); cursor: pointer;"></div>`,
-            iconSize: [20, 20],
-            iconAnchor: [10, 20]
-          });
-
-          console.log(`Creating camera marker at: [${cameraLat}, ${cameraLng}] for ${camera.name || camera.camera}`);
-
-          const cameraName = camera.name || camera.camera || 'Camera';
-          
-          const cameraMarker = L.marker(cameraPosition, { 
-            icon: cameraIcon,
-            title: cameraName
-          })
-            .addTo(this.map!);
-
-          // Add mouseenter handler to show camera card
-          cameraMarker.on('mouseover', () => {
-            this.onMapCameraHover(camera, cameraLat, cameraLng);
-          });
-
-          // Add mouseleave handler to hide camera card
-          cameraMarker.on('mouseout', () => {
-            this.selectedMapCamera = null;
-          });
-
-          // Add click handler to navigate to camera
-          cameraMarker.on('click', () => {
-            this.router.navigate(['/camera', camera.id]);
-          });
-
-          // Verify marker was added
-          console.log(`Camera marker created and added:`, cameraMarker);
-          console.log(`Marker position:`, cameraMarker.getLatLng());
-
-          this.cameraMarkers.push(cameraMarker);
-        } else {
-          console.warn(`Skipping camera ${camera.name || camera.camera} - invalid coordinates`);
-        }
-      });
-    });
-
-
-    // Fit map to show all markers
-    if (bounds.length > 0) {
-      console.log('Fitting map bounds with', bounds.length, 'markers');
-      console.log('Bounds array:', bounds);
-      this.map.fitBounds(bounds as L.LatLngBoundsExpression, { padding: [50, 50] });
-    } else {
-      console.warn('No bounds to fit map to');
-      // If no bounds, center on Dubai
-      this.map.setView([25.2048, 55.2708], 13);
-    }
-    
-    console.log('Total project markers:', this.markers.length);
-    console.log('Total camera markers:', this.cameraMarkers.length);
-    console.log('Map instance:', this.map);
-    console.log('Map container:', this.mapContainer?.nativeElement);
-    console.log('=== End updateMap ===');
-  }
-
-  private onMapCameraHover(camera: Camera, lat: number, lng: number) {
-    this.selectedMapCamera = camera;
-    
-    // If camera image hasn't been loaded yet, load it now
-    if (!camera.image) {
-      // Find the project for this camera
-      const project = this.projects.find(p => {
-        const cameras = this.projectCameras.get(p.id) || [];
-        return cameras.some(c => c.id === camera.id);
-      });
-      
-      if (project && project.developer && project.projectTag) {
-        // Get developer tag and load image
-        this.http.get<{ developerTag: string }>(`${API_CONFIG.baseUrl}/api/developers/${project.developer}`).subscribe({
-          next: (developer) => {
-            const developerTag = developer.developerTag || '';
-            const projectTag = project.projectTag || '';
-            if (developerTag && projectTag) {
-              this.loadCameraImage(camera, developerTag, projectTag);
-            }
-          },
-          error: (err) => {
-            console.error('Error loading developer tag for hover:', err);
-          }
-        });
-      }
-    }
-    
-    // Position the thumbnail card near the hovered marker
-    // Convert lat/lng to pixel coordinates
+  private cleanupMap() {
     if (this.map) {
-      const point = this.map.latLngToContainerPoint([lat, lng]);
-      // Position card to the left and slightly above the marker
-      this.thumbnailCardPosition = {
-        x: Math.max(20, point.x - 320), // 320px is approximately card width
-        y: Math.max(20, point.y - 200)   // Position above marker
-      };
-    }
-  }
-
-  navigateToCamera(cameraId: string, event: Event) {
-    event.stopPropagation();
-    this.router.navigate(['/camera', cameraId]);
-  }
-
-  /**
-   * Load camera images for a project
-   */
-  private loadCameraImagesForProject(project: Project, cameras: Camera[]) {
-    if (!project.developer || !project.projectTag) {
-      return;
-    }
-
-    // Get developer tag
-    this.http.get<{ developerTag: string }>(`${API_CONFIG.baseUrl}/api/developers/${project.developer}`).subscribe({
-      next: (developer) => {
-        const developerTag = developer.developerTag || '';
-        const projectTag = project.projectTag || '';
-        
-        if (!developerTag || !projectTag) {
-          return;
-        }
-
-        // Load images for each camera
-        cameras.forEach(camera => {
-          this.loadCameraImage(camera, developerTag, projectTag);
-        });
-      },
-      error: (err) => {
-        console.error('Error loading developer tag:', err);
-      }
-    });
-  }
-
-  /**
-   * Load image for a single camera
-   */
-  private loadCameraImage(camera: Camera, developerTag: string, projectTag: string) {
-    const cameraTag = camera.camera || '';
-    if (!cameraTag) return;
-
-    // Check cache first
-    const cachedTimestamp = this.cacheService.getLastPhoto(developerTag, projectTag, cameraTag);
-    
-    if (cachedTimestamp) {
-      const imageUrl = this.cameraPicsService.getProxiedImageUrl(developerTag, projectTag, cameraTag, cachedTimestamp);
-      // Preload image
-      const img = new Image();
-      img.onload = () => {
-        camera.image = imageUrl;
-        camera.thumbnail = imageUrl;
-        camera.lastPhotoDate = this.formatTimestampToDate(cachedTimestamp);
-      };
-      img.onerror = () => {
-        camera.image = null;
-        camera.thumbnail = null;
-      };
-      img.src = imageUrl;
-      return;
-    }
-
-    // Cache miss - fetch from API
-    this.cameraPicsService.getCameraPictures(developerTag, projectTag, cameraTag).subscribe({
-      next: (response) => {
-        if (response.lastPhoto) {
-          // Cache the timestamp
-          this.cacheService.setLastPhoto(developerTag, projectTag, cameraTag, response.lastPhoto);
-          
-          const imageUrl = this.cameraPicsService.getProxiedImageUrl(developerTag, projectTag, cameraTag, response.lastPhoto);
-          
-          // Preload image
-          const img = new Image();
-          img.onload = () => {
-            camera.image = imageUrl;
-            camera.thumbnail = imageUrl;
-            camera.lastPhotoDate = this.formatTimestampToDate(response.lastPhoto);
-          };
-          img.onerror = () => {
-            camera.image = null;
-            camera.thumbnail = null;
-          };
-          img.src = imageUrl;
-        } else {
-          camera.image = null;
-          camera.thumbnail = null;
-          camera.lastPhotoDate = 'N/A';
-        }
-      },
-      error: (err) => {
-        console.warn(`Failed to load image for camera ${camera.id}:`, err);
-        camera.image = null;
-        camera.thumbnail = null;
-        camera.lastPhotoDate = 'N/A';
-      }
-    });
-  }
-
-  /**
-   * Format timestamp (YYYYMMDDHHMMSS) to date string (DD-MMM-YYYY)
-   */
-  formatTimestampToDate(timestamp: string): string {
-    if (!timestamp || timestamp.length < 8) return 'N/A';
-    
-    const year = timestamp.substring(0, 4);
-    const month = timestamp.substring(4, 6);
-    const day = timestamp.substring(6, 8);
-    
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const monthIndex = parseInt(month, 10) - 1;
-    const monthName = months[monthIndex] || month;
-    
-    return `${day}-${monthName}-${year}`;
-  }
-
-  /**
-   * Format date string (ISO or other format) to DD-MMM-YYYY
-   */
-  formatDateString(dateStr: string): string {
-    if (!dateStr) return 'N/A';
-    
-    try {
-      const date = new Date(dateStr);
-      if (isNaN(date.getTime())) return 'N/A';
-      
-      const day = String(date.getDate()).padStart(2, '0');
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      const month = months[date.getMonth()];
-      const year = date.getFullYear();
-      
-      return `${day}-${month}-${year}`;
-    } catch (error) {
-      return 'N/A';
+      this.markers.forEach(marker => marker.remove());
+      this.markers = [];
+      this.cameraMarkers.forEach(marker => marker.remove());
+      this.cameraMarkers = [];
+      this.map.remove();
+      this.map = null;
     }
   }
 }
-
