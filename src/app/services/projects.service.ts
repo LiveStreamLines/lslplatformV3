@@ -78,7 +78,8 @@ export class ProjectsService {
       const statusLower = apiProject.status.toLowerCase();
       if (statusLower === 'active' || statusLower === 'in progress') {
         formattedStatus = 'IN PROGRESS';
-      } else if (statusLower === 'completed') {
+      } else if (statusLower === 'completed' || statusLower === 'finished') {
+        // Normalize "finished" to "completed"
         formattedStatus = 'COMPLETED';
       } else {
         formattedStatus = apiProject.status.toUpperCase();

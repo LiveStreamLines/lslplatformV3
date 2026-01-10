@@ -9,6 +9,7 @@ import { PROJECT_IMAGE } from '../../constants/figma-assets';
 import { CamerasService } from '../../services/cameras.service';
 import { CameraPicsService } from '../../services/camera-pics.service';
 import { ProjectsService } from '../../services/projects.service';
+import { AuthService } from '../../services/auth.service';
 import { Camera } from '../../models/camera.model';
 import { API_CONFIG } from '../../config/api.config';
 
@@ -24,6 +25,8 @@ export class CameraDetailComponent implements OnInit, OnDestroy, AfterViewChecke
   @ViewChild('dateInputNew', { static: false }) dateInputNewRef!: ElementRef<HTMLInputElement>;
   @ViewChild('dateInputModal', { static: false }) dateInputModalRef!: ElementRef<HTMLInputElement>;
   @ViewChild('thumbnailStrip', { static: false }) thumbnailStripRef!: ElementRef<HTMLDivElement>;
+  @ViewChild('thumbnailStripContainer', { static: false }) thumbnailStripContainerRef!: ElementRef<HTMLDivElement>;
+  @ViewChild('studioCanvas', { static: false }) studioCanvasRef!: ElementRef<HTMLCanvasElement>;
   
   // Expose console to template for debugging
   console = console;
@@ -61,26 +64,44 @@ export class CameraDetailComponent implements OnInit, OnDestroy, AfterViewChecke
   // Video Generation Modal
   showVideoGenerationModal = false;
   videoFromDate: Date = new Date();
-  videoFromTime: string = '00:00:00';
   videoToDate: Date = new Date();
-  videoToTime: string = '23:59:59';
+  videoFromHour: number = 0;
+  videoToHour: number = 23;
   videoResolution: string = '720';
   videoDuration: string = '1 Minute';
   showDateInVideo: boolean = false;
   showTimeInVideo: boolean = true;
   videoOverlayType: 'text' | 'logo' | 'watermark' | null = null;
+  videoTextOverlay: string = '';
+  videoLogoFile: File | null = null;
+  videoWatermarkFile: File | null = null;
+  videoWatermarkSize: number = 1.0;
+  videoWatermarkTransparency: number = 0.5;
   videoBrightness: number = 42;
   videoContrast: number = 42;
   videoSaturation: number = 42;
+  isGeneratingVideo: boolean = false;
+  videoGenerationError: string | null = null;
+  videoGenerationSuccess: string | null = null;
+  showVideoFromDatePicker: boolean = false;
+  showVideoToDatePicker: boolean = false;
+  showVideoFromTimePicker: boolean = false;
+  showVideoToTimePicker: boolean = false;
 
   // Photo Generation Modal
   showPhotoGenerationModal = false;
-  photoFromDate: Date = new Date();
-  photoFromTime: string = '00:00:00';
-  photoToDate: Date = new Date();
-  photoToTime: string = '23:59:59';
+  photoFromDate: string = ''; // YYYY-MM-DD format
+  photoToDate: string = ''; // YYYY-MM-DD format
+  photoHour1: number = 8;
+  photoHour2: number = 9;
   showDateInPhoto: boolean = false;
-  showTimeInPhoto: boolean = true;
+  showTimeInPhoto: boolean = false;
+  photoFirstDate: string = ''; // First available photo date
+  photoLastDate: string = ''; // Last available photo date
+  isGeneratingPhoto: boolean = false;
+  photoGenerationError: string | null = null;
+  photoGenerationSuccess: boolean = false;
+  filteredPicsCount: number = 0;
 
   // Compare Modal
   showCompareModal = false;
@@ -122,11 +143,44 @@ export class CameraDetailComponent implements OnInit, OnDestroy, AfterViewChecke
   studioTime: string = '00:00:00';
   studioImage: string | null = null;
   studioImageTimestamp: string | null = null;
-  studioTool: 'crop' | 'text' | 'box' | 'circle' | 'arrow' | 'image' | 'effect' | null = null;
+  studioTool: 'text' | 'box' | 'circle' | 'arrow' | 'image' | 'effect' | null = null;
   showStudioDatePicker = false;
   showStudioTimePicker = false;
-  studioHistory: any[] = []; // For undo/redo functionality
+  studioHistory: string[] = []; // Canvas states for undo/redo
   studioHistoryIndex: number = -1;
+  
+  // Canvas drawing state
+  isDrawing = false;
+  startX = 0;
+  startY = 0;
+  currentShape: any = null;
+  studioShapes: any[] = []; // Store all drawn shapes
+  studioTexts: any[] = []; // Store all text elements
+  
+  // Tool properties
+  studioStrokeColor = '#000000';
+  studioFillColor = '#ffffff';
+  studioStrokeWidth = 2;
+  studioFontSize = 16;
+  studioFontFamily = 'Arial';
+  studioTextValue = '';
+  studioTextColor = '#000000';
+  
+  // Text editing state
+  selectedTextIndex: number | null = null;
+  showTextInputModal = false; // Keep for easy reversion
+  pendingTextX = 0;
+  pendingTextY = 0;
+  newTextValue = '';
+  useInlineTextInput = false; // Toggle between modal and inline
+  textControllerPosition: { x: number; y: number } | null = null;
+  isDraggingText = false;
+  textDragOffsetX = 0;
+  textDragOffsetY = 0;
+  
+  // Canvas context
+  studioCanvasContext: CanvasRenderingContext2D | null = null;
+  studioCanvasReady = false; // Flag to track if canvas is ready
 
   constructor(
     private route: ActivatedRoute,
@@ -134,7 +188,8 @@ export class CameraDetailComponent implements OnInit, OnDestroy, AfterViewChecke
     private http: HttpClient,
     private camerasService: CamerasService,
     private cameraPicsService: CameraPicsService,
-    private projectsService: ProjectsService
+    private projectsService: ProjectsService,
+    private authService: AuthService
   ) {}
 
   ngOnInit() {
@@ -225,6 +280,21 @@ export class CameraDetailComponent implements OnInit, OnDestroy, AfterViewChecke
       String(today.getMonth() + 1).padStart(2, '0') +
       String(today.getDate()).padStart(2, '0');
 
+    // Check cache first
+    const cacheService = (this.cameraPicsService as any).cacheService;
+    if (cacheService) {
+      const cached = cacheService.getDateImages(developerTag, projectTag, cameraTag, todayStr);
+      if (cached) {
+        console.log('Loading today images from cache');
+        const sortedPhotos = cached.timestamps.sort((a: string, b: string) => b.localeCompare(a));
+        this.imageTimestamps = sortedPhotos;
+        this.loadingProgress = 100;
+        this.images = cached.imageUrls;
+        this.isLoading = false;
+        return;
+      }
+    }
+
     const url = `${API_CONFIG.baseUrl}/api/camerapics-s3-test/${developerTag}/${projectTag}/${cameraTag}/pictures/`;
     
     this.http.post<any>(url, { date1: todayStr, date2: todayStr }).subscribe({
@@ -281,6 +351,18 @@ export class CameraDetailComponent implements OnInit, OnDestroy, AfterViewChecke
   }
 
   loadImagesForDate(developerTag: string, projectTag: string, cameraTag: string, dateStr: string) {
+    // Check cache first - use the cache service from CameraPicsService
+    const cached = this.cameraPicsService['cacheService']?.getDateImages(developerTag, projectTag, cameraTag, dateStr);
+    if (cached) {
+      console.log(`Loading images for ${dateStr} from cache`);
+      const sortedPhotos = cached.timestamps.sort((a, b) => b.localeCompare(a));
+      this.imageTimestamps = sortedPhotos;
+      this.loadingProgress = 100;
+      this.images = cached.imageUrls;
+      this.isLoading = false;
+      return;
+    }
+
     const url = `${API_CONFIG.baseUrl}/api/camerapics-s3-test/${developerTag}/${projectTag}/${cameraTag}/pictures/`;
     
     this.http.post<any>(url, { date1: dateStr, date2: dateStr }).subscribe({
@@ -747,8 +829,16 @@ export class CameraDetailComponent implements OnInit, OnDestroy, AfterViewChecke
     // Initialize with current date/time
     this.videoFromDate = new Date();
     this.videoToDate = new Date();
-    this.videoFromTime = '00:00:00';
-    this.videoToTime = '23:59:59';
+    this.videoFromHour = 0;
+    this.videoToHour = 23;
+    this.showVideoFromDatePicker = false;
+    this.showVideoToDatePicker = false;
+    this.videoOverlayType = null;
+    this.videoTextOverlay = '';
+    this.videoLogoFile = null;
+    this.videoWatermarkFile = null;
+    this.videoWatermarkSize = 1.0;
+    this.videoWatermarkTransparency = 0.5;
     this.showVideoGenerationModal = true;
     document.body.style.overflow = 'hidden';
   }
@@ -783,40 +873,350 @@ export class CameraDetailComponent implements OnInit, OnDestroy, AfterViewChecke
   }
 
   /**
+   * Get date input value for video date picker (YYYY-MM-DD format)
+   */
+  getVideoDateInputValue(type: 'from' | 'to'): string {
+    const date = type === 'from' ? this.videoFromDate : this.videoToDate;
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+
+  /**
+   * Toggle video date picker
+   */
+  toggleVideoDatePicker(type: 'from' | 'to', event: Event) {
+    event.stopPropagation();
+    if (type === 'from') {
+      this.showVideoFromDatePicker = !this.showVideoFromDatePicker;
+      this.showVideoToDatePicker = false;
+      this.showVideoFromTimePicker = false;
+      this.showVideoToTimePicker = false;
+    } else {
+      this.showVideoToDatePicker = !this.showVideoToDatePicker;
+      this.showVideoFromDatePicker = false;
+      this.showVideoFromTimePicker = false;
+      this.showVideoToTimePicker = false;
+    }
+  }
+
+  /**
+   * Toggle video time picker
+   */
+  toggleVideoTimePicker(type: 'from' | 'to', event: Event) {
+    event.stopPropagation();
+    if (type === 'from') {
+      this.showVideoFromTimePicker = !this.showVideoFromTimePicker;
+      this.showVideoToTimePicker = false;
+      this.showVideoFromDatePicker = false;
+      this.showVideoToDatePicker = false;
+    } else {
+      this.showVideoToTimePicker = !this.showVideoToTimePicker;
+      this.showVideoFromTimePicker = false;
+      this.showVideoFromDatePicker = false;
+      this.showVideoToDatePicker = false;
+    }
+  }
+
+  /**
+   * Handle video date change
+   */
+  onVideoDateChange(type: 'from' | 'to', event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (input.value) {
+      const dateParts = input.value.split('-');
+      const newDate = new Date(
+        parseInt(dateParts[0], 10),
+        parseInt(dateParts[1], 10) - 1,
+        parseInt(dateParts[2], 10)
+      );
+      if (type === 'from') {
+        this.videoFromDate = newDate;
+        this.showVideoFromDatePicker = false;
+      } else {
+        this.videoToDate = newDate;
+        this.showVideoToDatePicker = false;
+      }
+    }
+  }
+
+  /**
+   * Prevent manual input in hour fields (only allow arrow keys)
+   */
+  preventManualHourInput(event: KeyboardEvent): void {
+    const allowedKeys = ['ArrowUp', 'ArrowDown', 'Tab', 'Backspace', 'Delete'];
+    if (!allowedKeys.includes(event.key)) {
+      event.preventDefault();
+    }
+  }
+
+  /**
+   * Increment video hour
+   */
+  incrementVideoHour(type: 'from' | 'to'): void {
+    if (type === 'from') {
+      if (this.videoFromHour < 22) {
+        this.videoFromHour++;
+        this.videoToHour = Math.max(this.videoToHour, this.videoFromHour + 1);
+      }
+    } else {
+      if (this.videoToHour < 23) {
+        this.videoToHour++;
+      }
+    }
+  }
+
+  /**
+   * Decrement video hour
+   */
+  decrementVideoHour(type: 'from' | 'to'): void {
+    if (type === 'from') {
+      if (this.videoFromHour > 0) {
+        this.videoFromHour--;
+        if (this.videoToHour <= this.videoFromHour) {
+          this.videoToHour = this.videoFromHour + 1;
+        }
+      }
+    } else {
+      if (this.videoToHour > this.videoFromHour + 1) {
+        this.videoToHour--;
+      }
+    }
+  }
+
+  /**
+   * Handle logo file selection
+   */
+  onLogoFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files.length > 0) {
+      this.videoLogoFile = input.files[0];
+    }
+  }
+
+  /**
+   * Handle logo drag and drop
+   */
+  onLogoDragOver(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  onLogoDrop(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.dataTransfer?.files && event.dataTransfer.files.length > 0) {
+      this.videoLogoFile = event.dataTransfer.files[0];
+    }
+  }
+
+  onLogoDragLeave(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  /**
+   * Handle watermark file selection
+   */
+  onWatermarkFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files.length > 0) {
+      this.videoWatermarkFile = input.files[0];
+    }
+  }
+
+  /**
+   * Handle watermark drag and drop
+   */
+  onWatermarkDragOver(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  onWatermarkDrop(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.dataTransfer?.files && event.dataTransfer.files.length > 0) {
+      this.videoWatermarkFile = event.dataTransfer.files[0];
+    }
+  }
+
+  onWatermarkDragLeave(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  /**
+   * Format file size for display
+   */
+  formatFileSize(bytes: number): string {
+    if (bytes < 1024) return bytes + 'B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + 'KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + 'MB';
+  }
+
+  /**
+   * Handle logo done button
+   */
+  onLogoDone(): void {
+    // Logo is ready, can close overlay section or keep it open
+    // User can change overlay type or proceed to generate
+  }
+
+  /**
+   * Handle watermark done button
+   */
+  onWatermarkDone(): void {
+    // Watermark is ready, can close overlay section or keep it open
+    // User can change overlay type or proceed to generate
+  }
+
+  /**
    * Generate video with current settings
    */
   generateVideo() {
-    // TODO: Implement video generation API call
-    console.log('Generating video with settings:', {
-      fromDate: this.videoFromDate,
-      fromTime: this.videoFromTime,
-      toDate: this.videoToDate,
-      toTime: this.videoToTime,
-      resolution: this.videoResolution,
-      duration: this.videoDuration,
-      showDate: this.showDateInVideo,
-      showTime: this.showTimeInVideo,
-      overlayType: this.videoOverlayType,
-      brightness: this.videoBrightness,
-      contrast: this.videoContrast,
-      saturation: this.videoSaturation
+    if (!this.camera || !this.currentDeveloperTag || !this.currentProjectTag || !this.currentCameraTag) {
+      this.videoGenerationError = 'Camera information is missing. Please refresh the page.';
+      return;
+    }
+
+    // Reset error and success messages
+    this.videoGenerationError = null;
+    this.videoGenerationSuccess = null;
+    this.isGeneratingVideo = true;
+
+    // Get user info from AuthService
+    const user = this.authService.getUser();
+    const userId = user?._id || '';
+    const userName = user?.name || user?.email || '';
+
+    // Format dates as YYYYMMDD
+    const formatDateToYYYYMMDD = (date: Date): string => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}${month}${day}`;
+    };
+
+    // Format time as HH (from HH:MM:SS format) - backend expects just the hour
+    const formatTimeToHH = (time: string): string => {
+      // Extract hour from HH:MM:SS or HH:MM format
+      const parts = time.split(':');
+      if (parts.length > 0) {
+        const hour = parts[0].padStart(2, '0');
+        return hour;
+      }
+      return '00';
+    };
+
+    // Convert duration from "X Minute(s)" to seconds
+    const parseDurationToSeconds = (duration: string): number => {
+      const match = duration.match(/(\d+)\s*(minute|min|second|sec)/i);
+      if (match) {
+        const value = parseInt(match[1], 10);
+        const unit = match[2].toLowerCase();
+        if (unit.startsWith('min')) {
+          return value * 60;
+        } else if (unit.startsWith('sec')) {
+          return value;
+        }
+      }
+      return 60; // Default to 1 minute
+    };
+
+    // Convert brightness/contrast/saturation from 0-100 scale to backend format
+    // Backend expects strings like "1.0", "0.0", "-1.0" etc.
+    // Assuming 0-100 maps to -1.0 to 1.0 (50 = 0.0)
+    const convertToBackendValue = (value: number): string => {
+      // Convert from 0-100 scale to -1.0 to 1.0 scale
+      const normalized = ((value - 50) / 50).toFixed(1);
+      return normalized;
+    };
+
+    const date1 = formatDateToYYYYMMDD(this.videoFromDate);
+    const date2 = formatDateToYYYYMMDD(this.videoToDate);
+    const hour1 = String(this.videoFromHour).padStart(2, '0');
+    const hour2 = String(this.videoToHour).padStart(2, '0');
+    const duration = parseDurationToSeconds(this.videoDuration);
+    const showdate = this.showDateInVideo || this.showTimeInVideo; // Show date if either is enabled
+    const showedText = this.videoOverlayType === 'text' ? this.videoTextOverlay : '';
+    const resolution = this.videoResolution;
+    const contrast = convertToBackendValue(this.videoContrast);
+    const brightness = convertToBackendValue(this.videoBrightness);
+    const saturation = convertToBackendValue(this.videoSaturation);
+
+    // Create FormData for file uploads (logo and watermark)
+    const formData = new FormData();
+    formData.append('developerId', this.currentDeveloperTag);
+    formData.append('projectId', this.currentProjectTag);
+    formData.append('cameraId', this.currentCameraTag);
+    formData.append('date1', date1);
+    formData.append('date2', date2);
+    formData.append('hour1', hour1);
+    formData.append('hour2', hour2);
+    formData.append('duration', duration.toString());
+    formData.append('showdate', showdate.toString());
+    formData.append('showedText', showedText);
+    formData.append('resolution', resolution);
+    formData.append('music', 'false');
+    formData.append('musicFile', '');
+    formData.append('contrast', contrast);
+    formData.append('brightness', brightness);
+    formData.append('saturation', saturation);
+    formData.append('userId', userId);
+    formData.append('userName', userName);
+
+    // Add logo and watermark file uploads
+    if (this.videoOverlayType === 'logo' && this.videoLogoFile) {
+      formData.append('logo', this.videoLogoFile);
+    }
+    if (this.videoOverlayType === 'watermark' && this.videoWatermarkFile) {
+      formData.append('showedWatermark', this.videoWatermarkFile);
+    }
+
+    // Get auth token
+    const token = this.authService.getToken();
+    const headers: { [key: string]: string } = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    // Make API call
+    const url = `${API_CONFIG.baseUrl}/api/video/videoGen`;
+    this.http.post<any>(url, formData, { headers }).subscribe({
+      next: (response) => {
+        this.isGeneratingVideo = false;
+        this.videoGenerationSuccess = `Video generation started successfully! ${response.filteredImageCount || 0} images will be processed.`;
+        console.log('Video generation response:', response);
+        
+        // Close modal after a short delay
+        setTimeout(() => {
+          this.closeVideoGenerationModal();
+          // Clear success message after closing
+          setTimeout(() => {
+            this.videoGenerationSuccess = null;
+          }, 3000);
+        }, 2000);
+      },
+      error: (error) => {
+        this.isGeneratingVideo = false;
+        this.videoGenerationError = error.error?.error || error.error?.message || error.message || 'Failed to generate video. Please try again.';
+        console.error('Error generating video:', error);
+      }
     });
-    
-    // Close modal after generation starts
-    // this.closeVideoGenerationModal();
   }
 
   /**
    * Open photo generation modal
    */
   openPhotoGenerationModal() {
-    // Initialize with current date/time
-    this.photoFromDate = new Date();
-    this.photoToDate = new Date();
-    this.photoFromTime = '00:00:00';
-    this.photoToTime = '23:59:59';
     this.showPhotoGenerationModal = true;
     document.body.style.overflow = 'hidden';
+    this.photoGenerationError = null;
+    this.photoGenerationSuccess = false;
+    this.setDefaultPhotoDates();
   }
 
   /**
@@ -828,42 +1228,175 @@ export class CameraDetailComponent implements OnInit, OnDestroy, AfterViewChecke
     }
     this.showPhotoGenerationModal = false;
     document.body.style.overflow = '';
+    this.photoGenerationError = null;
+    this.photoGenerationSuccess = false;
   }
 
   /**
-   * Format date for photo picker display (DD-MMM-YYYY)
+   * Set default dates for photo generation (first day of last month to last day of last month)
    */
-  formatDateForPhoto(date: Date): string {
-    const day = String(date.getDate()).padStart(2, '0');
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const month = months[date.getMonth()];
+  private setDefaultPhotoDates() {
+    const now = new Date();
+    const firstDayLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastDayLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+    
+    this.photoFromDate = this.formatDateForInput(firstDayLastMonth);
+    this.photoToDate = this.formatDateForInput(lastDayLastMonth);
+    
+    // Get first and last photo dates from camera
+    if (this.camera && this.imageTimestamps.length > 0) {
+      const firstTimestamp = this.imageTimestamps[this.imageTimestamps.length - 1]; // Oldest (last in array)
+      const lastTimestamp = this.imageTimestamps[0]; // Newest (first in array)
+      
+      if (firstTimestamp && firstTimestamp.length >= 8) {
+        this.photoFirstDate = this.timestampToDateString(firstTimestamp);
+      }
+      if (lastTimestamp && lastTimestamp.length >= 8) {
+        this.photoLastDate = this.timestampToDateString(lastTimestamp);
+      }
+    }
+  }
+
+  /**
+   * Format date for input (YYYY-MM-DD)
+   */
+  private formatDateForInput(date: Date): string {
     const year = date.getFullYear();
-    return `${day}-${month}-${year}`;
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 
   /**
-   * Format time for photo picker display (HH:MM:SS)
+   * Convert timestamp (YYYYMMDDHHMMSS) to date string (YYYY-MM-DD)
    */
-  formatTimeForPhoto(time: string): string {
-    return time;
+  private timestampToDateString(timestamp: string): string {
+    if (!timestamp || timestamp.length < 8) return '';
+    const year = timestamp.substring(0, 4);
+    const month = timestamp.substring(4, 6);
+    const day = timestamp.substring(6, 8);
+    return `${year}-${month}-${day}`;
+  }
+
+  /**
+   * Handle start date change - auto-adjust end date to one month later or last date
+   */
+  onPhotoStartDateChange() {
+    if (!this.photoFromDate) return;
+    
+    const startDateObj = new Date(this.photoFromDate);
+    const nextMonthDate = new Date(startDateObj);
+    nextMonthDate.setMonth(startDateObj.getMonth() + 1);
+    
+    const formattedNextMonthDate = this.formatDateForInput(nextMonthDate);
+    
+    // Set endDate to nextMonthDate or lastDate, whichever is earlier
+    if (this.photoLastDate && new Date(formattedNextMonthDate) > new Date(this.photoLastDate)) {
+      this.photoToDate = this.photoLastDate;
+    } else {
+      this.photoToDate = formattedNextMonthDate;
+    }
+  }
+
+  /**
+   * Increment hour
+   */
+  incrementPhotoHour(fieldName: 'photoHour1' | 'photoHour2') {
+    if (fieldName === 'photoHour1' && this.photoHour1 < 22) {
+      this.photoHour1++;
+      this.photoHour2 = Math.max(this.photoHour2, this.photoHour1 + 1);
+    } else if (fieldName === 'photoHour2' && this.photoHour2 < 23) {
+      this.photoHour2++;
+    }
+  }
+
+  /**
+   * Decrement hour
+   */
+  decrementPhotoHour(fieldName: 'photoHour1' | 'photoHour2') {
+    if (fieldName === 'photoHour1' && this.photoHour1 > 0) {
+      this.photoHour1--;
+      if (this.photoHour2 <= this.photoHour1) {
+        this.photoHour2 = this.photoHour1 + 1;
+      }
+    } else if (fieldName === 'photoHour2' && this.photoHour2 > this.photoHour1 + 1) {
+      this.photoHour2--;
+    }
+  }
+
+  /**
+   * Prevent manual input in hour fields
+   */
+  preventPhotoHourInput(event: KeyboardEvent) {
+    const allowedKeys = ['ArrowUp', 'ArrowDown', 'Tab', 'Backspace', 'Delete'];
+    if (!allowedKeys.includes(event.key)) {
+      event.preventDefault();
+    }
+  }
+
+  /**
+   * Format date for API (YYYYMMDD)
+   */
+  private formatDateForPhotoAPI(dateString: string): string {
+    return dateString.replace(/-/g, '');
   }
 
   /**
    * Generate photo with current settings
    */
   generatePhoto() {
-    // TODO: Implement photo generation API call
-    console.log('Generating photo with settings:', {
-      fromDate: this.photoFromDate,
-      fromTime: this.photoFromTime,
-      toDate: this.photoToDate,
-      toTime: this.photoToTime,
-      showDate: this.showDateInPhoto,
-      showTime: this.showTimeInPhoto
-    });
+    if (!this.camera || !this.currentProjectTag || !this.currentDeveloperTag) {
+      this.photoGenerationError = 'Camera information is missing';
+      return;
+    }
+
+    // Get user info from AuthService
+    const user = this.authService.getUser();
     
-    // Close modal after generation starts
-    // this.closePhotoGenerationModal();
+    if (!user) {
+      this.photoGenerationError = 'User not authenticated. Please login again.';
+      return;
+    }
+
+    // Check role and permissions
+    const role = user.role || '';
+    const permission = (user as any).canGenerateVideoAndPics || false;
+    const hasAccess = role === 'Super Admin' || role === 'Admin' || permission;
+
+    if (!hasAccess) {
+      this.photoGenerationError = 'You don\'t have permission to generate photos. Contact your admin.';
+      return;
+    }
+
+    this.isGeneratingPhoto = true;
+    this.photoGenerationError = null;
+    this.photoGenerationSuccess = false;
+    const userId = user?._id || '';
+    const userName = user?.name || '';
+
+    const formData = new FormData();
+    formData.append('developerId', this.currentDeveloperTag);
+    formData.append('projectId', this.currentProjectTag);
+    formData.append('cameraId', this.camera.camera || this.camera.name);
+    formData.append('date1', this.formatDateForPhotoAPI(this.photoFromDate));
+    formData.append('date2', this.formatDateForPhotoAPI(this.photoToDate));
+    formData.append('hour1', this.photoHour1.toString().padStart(2, '0'));
+    formData.append('hour2', this.photoHour2.toString().padStart(2, '0'));
+    formData.append('userId', userId);
+    formData.append('userName', userName);
+
+    this.http.post<{ message: string; filteredImageCount: number }>(`${API_CONFIG.baseUrl}/api/video/photoGen`, formData).subscribe({
+      next: (response) => {
+        this.isGeneratingPhoto = false;
+        this.photoGenerationSuccess = true;
+        this.filteredPicsCount = response.filteredImageCount;
+      },
+      error: (error) => {
+        this.isGeneratingPhoto = false;
+        this.photoGenerationError = error.error?.error || 'Failed to generate photo request. Please try again.';
+        console.error('Photo generation error:', error);
+      }
+    });
   }
 
   /**
@@ -879,13 +1412,13 @@ export class CameraDetailComponent implements OnInit, OnDestroy, AfterViewChecke
       setTimeout(() => {
         this.updateThumbnailScroll();
       }, 100);
-      // Add click outside listener
+      // Add click outside listener (use capture phase to catch events before stopPropagation)
       setTimeout(() => {
-        document.addEventListener('click', this.handleClickOutsideThumbnailStrip);
-      }, 0);
+        document.addEventListener('click', this.handleClickOutsideThumbnailStrip, true);
+      }, 100);
     } else {
       // Remove click outside listener
-      document.removeEventListener('click', this.handleClickOutsideThumbnailStrip);
+      document.removeEventListener('click', this.handleClickOutsideThumbnailStrip, true);
     }
   }
 
@@ -894,22 +1427,47 @@ export class CameraDetailComponent implements OnInit, OnDestroy, AfterViewChecke
    */
   closeThumbnailStrip() {
     this.showThumbnailStrip = false;
-    document.removeEventListener('click', this.handleClickOutsideThumbnailStrip);
+    document.removeEventListener('click', this.handleClickOutsideThumbnailStrip, true);
   }
 
   /**
    * Handle click outside thumbnail strip
    */
   private handleClickOutsideThumbnailStrip = (event: MouseEvent) => {
-    const target = event.target as HTMLElement;
-    const stripContainer = document.querySelector('.thumbnail-strip-container');
-    const sliderBtn = document.querySelector('.slider-btn');
-    
-    // Close if clicking outside the strip and not on the slider button
-    if (stripContainer && !stripContainer.contains(target) && 
-        sliderBtn && !sliderBtn.contains(target)) {
-      this.closeThumbnailStrip();
+    if (!this.showThumbnailStrip) {
+      return; // Strip is already closed
     }
+
+    const target = event.target as HTMLElement;
+    if (!target) {
+      return;
+    }
+
+    // Check if click is inside thumbnail strip container using ViewChild
+    if (this.thumbnailStripContainerRef?.nativeElement?.contains(target)) {
+      return; // Click is inside the strip, don't close
+    }
+    
+    // Fallback: check using querySelector
+    const stripContainer = document.querySelector('.thumbnail-strip-container');
+    if (stripContainer && stripContainer.contains(target)) {
+      return; // Click is inside the strip, don't close
+    }
+    
+    // Check if click is on the slider button that toggles the strip
+    if (target.closest('.main-slider-btn')) {
+      return; // Click is on the toggle button, let toggleThumbnailStrip handle it
+    }
+    
+    // Check if click is on date picker elements
+    if (target.closest('.new-date-picker-wrapper') || 
+        target.closest('.main-calendar-dropdown') ||
+        target.closest('.new-date-picker-button')) {
+      return; // Click is on date picker, don't close
+    }
+    
+    // Click is outside strip, button, and date picker - close the strip
+    this.closeThumbnailStrip();
   };
 
   /**
@@ -1600,6 +2158,17 @@ export class CameraDetailComponent implements OnInit, OnDestroy, AfterViewChecke
    * Open studio modal
    */
   openStudioModal() {
+    // Clear previous studio state
+    this.studioShapes = [];
+    this.studioTexts = [];
+    this.studioHistory = [];
+    this.studioHistoryIndex = -1;
+    
+    // Get current tags
+    const developerTag = this.currentDeveloperTag;
+    const projectTag = this.currentProjectTag;
+    const cameraTag = this.currentCameraTag;
+    
     // Initialize with current image timestamp
     if (this.images.length > 0 && this.imageTimestamps.length > 0) {
       const currentTimestamp = this.imageTimestamps[this.currentImageIndex];
@@ -1614,17 +2183,62 @@ export class CameraDetailComponent implements OnInit, OnDestroy, AfterViewChecke
         this.studioDate = new Date(year, month, day);
         this.studioTime = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:${String(second).padStart(2, '0')}`;
         this.studioImageTimestamp = currentTimestamp;
+        
+        // Load image using presigned URL (more reliable than proxy)
+        this.cameraPicsService.getImagePresignedUrl(developerTag, projectTag, cameraTag, currentTimestamp).subscribe({
+          next: (presignedUrl) => {
+            if (presignedUrl) {
+              this.studioImage = presignedUrl;
+              console.log('Studio image loaded from presigned URL:', presignedUrl);
+              this.studioTool = null;
+              this.showStudioModal = true;
+              document.body.style.overflow = 'hidden';
+              
+              // Initialize canvas after view is ready and image is set
+              setTimeout(() => {
+                this.initStudioCanvas();
+              }, 300);
+            } else {
+              // Fallback to proxy URL
+              console.warn('Presigned URL is empty, falling back to proxy URL');
+              this.studioImage = this.images[this.currentImageIndex];
+              this.studioTool = null;
+              this.showStudioModal = true;
+              document.body.style.overflow = 'hidden';
+              setTimeout(() => {
+                this.initStudioCanvas();
+              }, 300);
+            }
+          },
+          error: (err) => {
+            console.error('Error getting presigned URL for studio, falling back to proxy URL:', err);
+            // Fallback to proxy URL
+            this.studioImage = this.images[this.currentImageIndex];
+            this.studioTool = null;
+            this.showStudioModal = true;
+            document.body.style.overflow = 'hidden';
+            setTimeout(() => {
+              this.initStudioCanvas();
+            }, 300);
+          }
+        });
+        return; // Exit early since we're handling async loading
       }
     }
     
-    // Load current image
-    if (this.images.length > 0) {
+    // Fallback: Load current image immediately if no timestamp available
+    if (this.images.length > 0 && this.currentImageIndex >= 0 && this.currentImageIndex < this.images.length) {
       this.studioImage = this.images[this.currentImageIndex];
     }
     
     this.studioTool = null;
     this.showStudioModal = true;
     document.body.style.overflow = 'hidden';
+    
+    // Initialize canvas after view is ready and image is set
+    setTimeout(() => {
+      this.initStudioCanvas();
+    }, 300);
   }
 
   /**
@@ -1671,6 +2285,11 @@ export class CameraDetailComponent implements OnInit, OnDestroy, AfterViewChecke
    * Load studio image based on selected date/time
    */
   loadStudioImage() {
+    // Clear existing shapes when loading new image
+    this.studioShapes = [];
+    this.studioTexts = [];
+    this.studioHistory = [];
+    this.studioHistoryIndex = -1;
     if (!this.camera) return;
 
     const dateStr = this.formatDateToYYYYMMDD(this.studioDate);
@@ -1709,10 +2328,40 @@ export class CameraDetailComponent implements OnInit, OnDestroy, AfterViewChecke
                   }
                 }
                 
-                // Load the closest image
-                const imageUrl = this.cameraPicsService.getProxiedImageUrl(developerTag, projectTag, cameraTag, closestTimestamp);
-                this.studioImage = imageUrl;
-                this.studioImageTimestamp = closestTimestamp;
+                // Load the closest image using presigned URL endpoint (more reliable)
+                this.cameraPicsService.getImagePresignedUrl(developerTag, projectTag, cameraTag, closestTimestamp).subscribe({
+                  next: (presignedUrl) => {
+                    if (presignedUrl) {
+                      this.studioImage = presignedUrl;
+                      this.studioImageTimestamp = closestTimestamp;
+                      console.log('Loading studio image from presigned URL:', presignedUrl);
+                      console.log('Using timestamp:', closestTimestamp);
+                      // Reinitialize canvas with new image
+                      setTimeout(() => {
+                        this.initStudioCanvas();
+                      }, 100);
+                    } else {
+                      console.warn('Presigned URL is empty, falling back to proxy URL');
+                      // Fallback to proxy URL
+                      const imageUrl = this.cameraPicsService.getProxiedImageUrl(developerTag, projectTag, cameraTag, closestTimestamp);
+                      this.studioImage = imageUrl;
+                      this.studioImageTimestamp = closestTimestamp;
+                      setTimeout(() => {
+                        this.initStudioCanvas();
+                      }, 100);
+                    }
+                  },
+                  error: (err) => {
+                    console.error('Error getting presigned URL, falling back to proxy URL:', err);
+                    // Fallback to proxy URL
+                    const imageUrl = this.cameraPicsService.getProxiedImageUrl(developerTag, projectTag, cameraTag, closestTimestamp);
+                    this.studioImage = imageUrl;
+                    this.studioImageTimestamp = closestTimestamp;
+                    setTimeout(() => {
+                      this.initStudioCanvas();
+                    }, 100);
+                  }
+                });
               }
             },
             error: (err) => {
@@ -1740,28 +2389,32 @@ export class CameraDetailComponent implements OnInit, OnDestroy, AfterViewChecke
   /**
    * Set studio tool
    */
-  setStudioTool(tool: 'crop' | 'text' | 'box' | 'circle' | 'arrow' | 'image' | 'effect' | null) {
+  setStudioTool(tool: 'text' | 'box' | 'circle' | 'arrow' | 'image' | 'effect' | null) {
     this.studioTool = tool;
+    // Clear selection when switching tools
+    this.selectedTextIndex = null;
   }
 
   /**
    * Clear all studio edits
    */
   clearStudioAll() {
+    this.studioShapes = [];
+    this.studioTexts = [];
     this.studioTool = null;
     this.studioHistory = [];
     this.studioHistoryIndex = -1;
-    // Add logic to clear all edits when implemented
+    this.redrawStudioCanvas();
+    this.saveStudioState();
   }
 
   /**
    * Undo studio action
    */
   undoStudioAction() {
-    if (this.studioHistoryIndex > 0) {
+    if (this.studioHistoryIndex > 0 && this.studioHistory.length > 0) {
       this.studioHistoryIndex--;
-      // Apply the previous state
-      // This will be implemented when editing functionality is added
+      this.restoreStudioState();
     }
   }
 
@@ -1771,9 +2424,27 @@ export class CameraDetailComponent implements OnInit, OnDestroy, AfterViewChecke
   redoStudioAction() {
     if (this.studioHistoryIndex < this.studioHistory.length - 1) {
       this.studioHistoryIndex++;
-      // Apply the next state
-      // This will be implemented when editing functionality is added
+      this.restoreStudioState();
     }
+  }
+
+  /**
+   * Restore canvas state from history
+   */
+  restoreStudioState() {
+    if (!this.studioCanvasRef?.nativeElement || !this.studioCanvasContext) return;
+    if (this.studioHistoryIndex < 0 || this.studioHistoryIndex >= this.studioHistory.length) return;
+    
+    const canvas = this.studioCanvasRef.nativeElement;
+    const ctx = this.studioCanvasContext;
+    const state = this.studioHistory[this.studioHistoryIndex];
+    
+    const img = new Image();
+    img.onload = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0);
+    };
+    img.src = state;
   }
 
   /**
@@ -1788,13 +2459,779 @@ export class CameraDetailComponent implements OnInit, OnDestroy, AfterViewChecke
    * Download studio image
    */
   downloadStudioImage() {
-    if (this.studioImage) {
+    if (this.studioCanvasRef?.nativeElement) {
+      const canvas = this.studioCanvasRef.nativeElement;
+      canvas.toBlob((blob: Blob | null) => {
+        if (blob) {
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `studio-image-${this.studioImageTimestamp || Date.now()}.jpg`;
+          link.click();
+          URL.revokeObjectURL(url);
+        }
+      }, 'image/jpeg', 0.95);
+    } else if (this.studioImage) {
       const link = document.createElement('a');
       link.href = this.studioImage;
       link.download = `studio-image-${this.studioImageTimestamp || Date.now()}.jpg`;
       link.click();
     }
   }
+
+  /**
+   * Initialize studio canvas
+   */
+  initStudioCanvas() {
+    if (!this.studioImage) {
+      console.warn('Studio image not set');
+      return;
+    }
+    
+    // Try to find canvas element - it might not be in ViewChild yet due to *ngIf
+    let canvas: HTMLCanvasElement | null = null;
+    
+    if (this.studioCanvasRef?.nativeElement) {
+      canvas = this.studioCanvasRef.nativeElement;
+    } else {
+      // Try to find canvas in DOM directly
+      const canvasElement = document.querySelector('.studio-canvas-element') as HTMLCanvasElement;
+      if (canvasElement) {
+        canvas = canvasElement;
+      }
+    }
+    
+    if (!canvas) {
+      // Retry if canvas not ready yet
+      if (this.showStudioModal) {
+        setTimeout(() => {
+          this.initStudioCanvas();
+        }, 100);
+      }
+      return;
+    }
+    
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      console.error('Could not get 2d context from canvas');
+      return;
+    }
+    
+    this.studioCanvasContext = ctx;
+    
+    // Load image and draw on canvas
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    
+    img.onload = () => {
+      if (!canvas || !ctx) {
+        console.error('Canvas or context is null when image loaded');
+        return;
+      }
+      
+      console.log('Studio image loaded:', img.width, 'x', img.height);
+      
+      // Get container dimensions for proper scaling - use setTimeout to ensure container is rendered
+      const container = canvas.parentElement;
+      if (!container) {
+        console.error('Canvas parent container not found');
+        return;
+      }
+      
+      // Wait for container to be fully rendered
+      setTimeout(() => {
+        // Re-check canvas and context are still available
+        if (!canvas || !ctx) {
+          console.error('Canvas or context is null in setTimeout');
+          return;
+        }
+        
+        const containerWidth = container.clientWidth || 800;
+        const containerHeight = container.clientHeight || 600;
+        
+        console.log('Container size:', containerWidth, 'x', containerHeight);
+        
+        // Calculate display size maintaining aspect ratio
+        const imageAspect = img.width / img.height;
+        const containerAspect = containerWidth / containerHeight;
+        
+        let displayWidth: number;
+        let displayHeight: number;
+        
+        if (imageAspect > containerAspect) {
+          // Image is wider - fit to width
+          displayWidth = containerWidth;
+          displayHeight = containerWidth / imageAspect;
+        } else {
+          // Image is taller - fit to height
+          displayHeight = containerHeight;
+          displayWidth = containerHeight * imageAspect;
+        }
+        
+        // Double the width and height as requested
+        displayWidth = displayWidth * 2;
+        displayHeight = displayHeight * 2;
+        
+        console.log('Calculated display size:', displayWidth, 'x', displayHeight);
+        
+        // First, wait for the background image to load and get its natural size
+        const bgImage = container.querySelector('.studio-canvas-image') as HTMLImageElement;
+        if (!bgImage) {
+          console.warn('Background image element not found');
+          return;
+        }
+        
+        // Wait for background image to load if not already loaded
+        const setupCanvasSize = () => {
+          // Re-check canvas and context are still available
+          if (!canvas || !ctx) {
+            console.error('Canvas or context is null in setupCanvasSize');
+            return;
+          }
+          
+          // Get the actual rendered size and position of the image
+          const imageRect = bgImage.getBoundingClientRect();
+          const containerRect = container.getBoundingClientRect();
+          
+          // Calculate position relative to container
+          const imageLeft = imageRect.left - containerRect.left;
+          const imageTop = imageRect.top - containerRect.top;
+          const actualImageWidth = imageRect.width;
+          const actualImageHeight = imageRect.height;
+          
+          console.log('Container size:', containerRect.width, 'x', containerRect.height);
+          console.log('Image position:', imageLeft, ',', imageTop);
+          console.log('Actual rendered image size:', actualImageWidth, 'x', actualImageHeight);
+          console.log('Calculated display size:', displayWidth, 'x', displayHeight);
+          
+          // Use fixed canvas size for testing
+          const fixedCanvasWidth = 800;
+          const fixedCanvasHeight = 600;
+          
+          // Set canvas actual size (for drawing) - use fixed size
+          canvas.width = fixedCanvasWidth;
+          canvas.height = fixedCanvasHeight;
+          
+          // Set canvas display size (CSS) - use fixed size
+          canvas.style.setProperty('width', fixedCanvasWidth + 'px', 'important');
+          canvas.style.setProperty('height', fixedCanvasHeight + 'px', 'important');
+          canvas.style.setProperty('max-width', 'none', 'important');
+          canvas.style.setProperty('max-height', 'none', 'important');
+          canvas.style.setProperty('min-width', fixedCanvasWidth + 'px', 'important');
+          canvas.style.setProperty('min-height', fixedCanvasHeight + 'px', 'important');
+          canvas.style.margin = '0';
+          canvas.style.padding = '0';
+          canvas.style.position = 'absolute';
+          canvas.style.left = imageLeft + 'px';
+          canvas.style.top = imageTop + 'px';
+          canvas.style.right = 'auto';
+          canvas.style.background = 'transparent';
+          canvas.style.pointerEvents = 'auto';
+          canvas.style.zIndex = '10';
+          
+          // Clear canvas with transparent background (image is in background layer, not on canvas)
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          
+          console.log('Canvas display size:', fixedCanvasWidth, 'x', fixedCanvasHeight);
+          console.log('Canvas position:', imageLeft, ',', imageTop);
+          console.log('Canvas actual size:', canvas.width, 'x', canvas.height);
+          
+          // Store image position for coordinate calculations
+          (canvas as any).imageOffsetX = imageLeft;
+          (canvas as any).imageOffsetY = imageTop;
+          
+          // Mark canvas as ready
+          this.studioCanvasReady = true;
+          
+          // Save initial state (empty transparent canvas)
+          this.saveStudioState();
+          
+          // Redraw all shapes (if any)
+          this.redrawStudioCanvas();
+          
+          console.log('Canvas initialized successfully');
+        };
+        
+        // Set background image to fill container, let CSS handle sizing with object-fit: contain
+        bgImage.style.width = '100%';
+        bgImage.style.height = '100%';
+        bgImage.style.maxWidth = '100%';
+        bgImage.style.maxHeight = '100%';
+        bgImage.style.objectFit = 'contain';
+        bgImage.style.position = 'absolute';
+        bgImage.style.left = '0';
+        bgImage.style.top = '0';
+        
+        // Wait for the image to load and render, then setup canvas to match actual rendered size
+        const waitForImageRender = () => {
+          // Wait a bit longer to ensure image has rendered
+          setTimeout(() => {
+            setupCanvasSize();
+          }, 150);
+        };
+        
+        if (bgImage.complete && bgImage.naturalWidth > 0) {
+          // Image already loaded
+          waitForImageRender();
+        } else {
+          // Wait for image to load
+          bgImage.onload = () => {
+            waitForImageRender();
+          };
+        }
+      }, 100);
+      
+    };
+    
+    img.onerror = (error) => {
+      console.error('Error loading studio image:', this.studioImage, error);
+      
+      // If this is a proxy URL and we have a timestamp, try getting presigned URL
+      if (this.studioImage && this.studioImage.includes('/proxy/') && this.studioImageTimestamp) {
+        const developerTag = this.currentDeveloperTag;
+        const projectTag = this.currentProjectTag;
+        const cameraTag = this.currentCameraTag;
+        
+        if (developerTag && projectTag && cameraTag) {
+          console.log('Proxy URL failed, trying presigned URL...');
+          this.cameraPicsService.getImagePresignedUrl(developerTag, projectTag, cameraTag, this.studioImageTimestamp).subscribe({
+            next: (presignedUrl) => {
+              if (presignedUrl) {
+                console.log('Got presigned URL, retrying:', presignedUrl);
+                this.studioImage = presignedUrl;
+                // Retry canvas initialization with presigned URL
+                setTimeout(() => {
+                  this.initStudioCanvas();
+                }, 100);
+              } else {
+                console.error('Presigned URL is empty');
+                this.studioCanvasReady = false;
+              }
+            },
+            error: (err) => {
+              console.error('Error getting presigned URL:', err);
+              // Try adding .jpg extension as last resort
+              this.tryStudioImageWithExtension();
+            }
+          });
+          return;
+        }
+      }
+      
+      // Try adding .jpg extension if URL doesn't have an extension
+      this.tryStudioImageWithExtension();
+    };
+    
+    console.log('Loading studio image:', this.studioImage);
+    img.src = this.studioImage;
+  }
+
+  /**
+   * Helper method to try loading image with .jpg extension
+   */
+  private tryStudioImageWithExtension() {
+    if (this.studioImage && !this.studioImage.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
+      const retryUrl = this.studioImage + '.jpg';
+      console.log('Retrying with .jpg extension:', retryUrl);
+      
+      const retryImg = new Image();
+      retryImg.crossOrigin = 'anonymous';
+      retryImg.onload = () => {
+        console.log('Image loaded successfully with .jpg extension');
+        this.studioImage = retryUrl;
+        // Retry canvas initialization with corrected URL
+        setTimeout(() => {
+          this.initStudioCanvas();
+        }, 100);
+      };
+      retryImg.onerror = (retryError) => {
+        console.error('Image still failed to load with .jpg extension:', retryUrl, retryError);
+        this.studioCanvasReady = false;
+      };
+      retryImg.src = retryUrl;
+    } else {
+      // Already has extension or retry failed - just log the error
+      this.studioCanvasReady = false;
+    }
+  }
+
+  /**
+   * Redraw canvas with all shapes
+   */
+  redrawStudioCanvas() {
+    if (!this.studioCanvasContext) return;
+    
+    const ctx = this.studioCanvasContext;
+    
+    // Try to find canvas element
+    let canvas: HTMLCanvasElement | null = null;
+    if (this.studioCanvasRef?.nativeElement) {
+      canvas = this.studioCanvasRef.nativeElement;
+    } else {
+      const canvasElement = document.querySelector('.studio-canvas-element') as HTMLCanvasElement;
+      if (canvasElement) {
+        canvas = canvasElement;
+      }
+    }
+    
+    if (!canvas) return;
+    
+    // Clear canvas and redraw only shapes/text (image is in background layer)
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Redraw all shapes
+    this.studioShapes.forEach(shape => {
+      this.drawShape(ctx, shape);
+    });
+    
+    // Redraw all texts
+    this.studioTexts.forEach((text, index) => {
+      this.drawText(ctx, text, index);
+    });
+  }
+
+  /**
+   * Draw a shape on canvas
+   */
+  drawShape(ctx: CanvasRenderingContext2D, shape: any) {
+    ctx.strokeStyle = shape.strokeColor || this.studioStrokeColor;
+    ctx.fillStyle = shape.fillColor || this.studioFillColor;
+    ctx.lineWidth = shape.strokeWidth || this.studioStrokeWidth;
+    
+    const { type, x, y, width, height, startX, startY, endX, endY } = shape;
+    
+    switch (type) {
+      case 'box':
+        ctx.strokeRect(x, y, width, height);
+        break;
+      case 'circle':
+        const radius = Math.min(Math.abs(width), Math.abs(height)) / 2;
+        const centerX = x + width / 2;
+        const centerY = y + height / 2;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+        ctx.stroke();
+        break;
+      case 'arrow':
+        this.drawArrow(ctx, startX, startY, endX, endY);
+        break;
+    }
+  }
+
+  /**
+   * Draw arrow
+   */
+  drawArrow(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number) {
+    const headlen = 10;
+    const angle = Math.atan2(y2 - y1, x2 - x1);
+    
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.lineTo(x2 - headlen * Math.cos(angle - Math.PI / 6), y2 - headlen * Math.sin(angle - Math.PI / 6));
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - headlen * Math.cos(angle + Math.PI / 6), y2 - headlen * Math.sin(angle + Math.PI / 6));
+    ctx.stroke();
+  }
+
+  /**
+   * Draw text on canvas
+   */
+  drawText(ctx: CanvasRenderingContext2D, text: any, index?: number) {
+    const isSelected = index !== undefined && this.selectedTextIndex === index;
+    ctx.fillStyle = text.color || this.studioTextColor;
+    ctx.font = `${text.fontSize || this.studioFontSize}px ${text.fontFamily || this.studioFontFamily}`;
+    ctx.fillText(text.value || '', text.x || 0, text.y || 0);
+    
+    // Draw selection indicator if text is selected
+    if (isSelected) {
+      const metrics = ctx.measureText(text.value || '');
+      ctx.strokeStyle = '#5621d2';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 5]);
+      ctx.strokeRect(
+        (text.x || 0) - 2,
+        (text.y || 0) - (text.fontSize || this.studioFontSize) - 2,
+        metrics.width + 4,
+        (text.fontSize || this.studioFontSize) + 4
+      );
+      ctx.setLineDash([]);
+    }
+  }
+
+  /**
+   * Save current canvas state for undo/redo
+   */
+  saveStudioState() {
+    if (!this.studioCanvasRef?.nativeElement) return;
+    
+    const canvas = this.studioCanvasRef.nativeElement;
+    const state = canvas.toDataURL();
+    
+    // Remove any states after current index (when new action after undo)
+    this.studioHistory = this.studioHistory.slice(0, this.studioHistoryIndex + 1);
+    
+    // Add new state
+    this.studioHistory.push(state);
+    this.studioHistoryIndex = this.studioHistory.length - 1;
+    
+    // Limit history size
+    if (this.studioHistory.length > 50) {
+      this.studioHistory.shift();
+      this.studioHistoryIndex--;
+    }
+  }
+
+  /**
+   * Handle canvas mouse down
+   */
+  onStudioCanvasMouseDown(event: MouseEvent) {
+    // Try to find canvas element
+    let canvas: HTMLCanvasElement | null = null;
+    if (this.studioCanvasRef?.nativeElement) {
+      canvas = this.studioCanvasRef.nativeElement;
+    } else {
+      const canvasElement = document.querySelector('.studio-canvas-element') as HTMLCanvasElement;
+      if (canvasElement) {
+        canvas = canvasElement;
+      }
+    }
+    
+    if (!canvas || !this.studioCanvasContext) {
+      console.warn('Canvas or context not available');
+      return;
+    }
+    
+    const rect = canvas.getBoundingClientRect();
+    
+    // Calculate scale factor between display size and actual canvas size
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    // Get mouse position relative to canvas
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+    
+    // Ensure coordinates are within canvas bounds
+    if (mouseX < 0 || mouseX > rect.width || mouseY < 0 || mouseY > rect.height) {
+      console.log('Mouse outside canvas bounds:', mouseX, mouseY, 'Canvas size:', rect.width, rect.height);
+      return;
+    }
+    
+    // Scale to canvas coordinates
+    const canvasX = mouseX * scaleX;
+    const canvasY = mouseY * scaleY;
+    
+    console.log('Mouse down - Canvas rect:', rect.left, rect.top, rect.width, rect.height);
+    console.log('Mouse down - Event position:', event.clientX, event.clientY);
+    console.log('Mouse down - Relative position:', mouseX, mouseY);
+    console.log('Mouse down - Canvas coordinates:', canvasX, canvasY);
+    
+    // Check if clicking on existing text (for text tool)
+    if (this.studioTool === 'text') {
+      // Check if clicking on an existing text element
+      const clickedTextIndex = this.findTextAtPosition(canvasX, canvasY);
+      
+      if (clickedTextIndex !== null) {
+        // Select and start dragging this text
+        this.selectedTextIndex = clickedTextIndex;
+        const text = this.studioTexts[clickedTextIndex];
+        this.textDragOffsetX = canvasX - (text.x || 0);
+        this.textDragOffsetY = canvasY - (text.y || 0);
+        this.isDraggingText = true;
+        // Update controller position
+        this.updateTextControllerPosition();
+        this.redrawStudioCanvas();
+        return;
+      } else {
+        // Deselect if clicking elsewhere
+        this.selectedTextIndex = null;
+        // Add new text at click position
+        if (this.useInlineTextInput) {
+          // Inline approach: Add text immediately with default value
+          this.addStudioText(canvasX, canvasY, 'New Text');
+          // Update controller position after text is added
+          setTimeout(() => {
+            this.updateTextControllerPosition();
+          }, 0);
+        } else {
+          // Modal approach: Store position and show modal
+          this.pendingTextX = canvasX;
+          this.pendingTextY = canvasY;
+          this.newTextValue = '';
+          this.showTextInputModal = true;
+        }
+      }
+    } else if (this.studioTool) {
+      // For other tools, start drawing
+      this.startX = canvasX;
+      this.startY = canvasY;
+      this.isDrawing = true;
+      this.selectedTextIndex = null; // Deselect text when using other tools
+    }
+  }
+  
+  /**
+   * Find text at given position
+   */
+  findTextAtPosition(x: number, y: number): number | null {
+    if (!this.studioCanvasContext) return null;
+    
+    for (let i = this.studioTexts.length - 1; i >= 0; i--) {
+      const text = this.studioTexts[i];
+      const textX = text.x || 0;
+      const textY = text.y || 0;
+      const fontSize = text.fontSize || this.studioFontSize;
+      
+      // Measure text width
+      this.studioCanvasContext.font = `${fontSize}px ${text.fontFamily || this.studioFontFamily}`;
+      const metrics = this.studioCanvasContext.measureText(text.value || '');
+      const textWidth = metrics.width;
+      const textHeight = fontSize;
+      
+      // Check if click is within text bounds
+      if (x >= textX - 5 && x <= textX + textWidth + 5 &&
+          y >= textY - textHeight - 5 && y <= textY + 5) {
+        return i;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Handle canvas mouse move
+   */
+  onStudioCanvasMouseMove(event: MouseEvent) {
+    // Try to find canvas element
+    let canvas: HTMLCanvasElement | null = null;
+    if (this.studioCanvasRef?.nativeElement) {
+      canvas = this.studioCanvasRef.nativeElement;
+    } else {
+      const canvasElement = document.querySelector('.studio-canvas-element') as HTMLCanvasElement;
+      if (canvasElement) {
+        canvas = canvasElement;
+      }
+    }
+    
+    if (!canvas || !this.studioCanvasContext) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    // Calculate scale factor between display size and actual canvas size
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    // Get mouse position relative to canvas
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+    
+    // Clamp coordinates to canvas bounds
+    const clampedX = Math.max(0, Math.min(mouseX, rect.width));
+    const clampedY = Math.max(0, Math.min(mouseY, rect.height));
+    
+    // Scale to canvas coordinates
+    const currentX = clampedX * scaleX;
+    const currentY = clampedY * scaleY;
+    
+    // Handle text dragging
+    if (this.isDraggingText && this.selectedTextIndex !== null) {
+      const text = this.studioTexts[this.selectedTextIndex];
+      text.x = currentX - this.textDragOffsetX;
+      text.y = currentY - this.textDragOffsetY;
+      // Update controller position while dragging
+      this.updateTextControllerPosition();
+      this.redrawStudioCanvas();
+      return;
+    }
+    
+    // Handle shape drawing
+    if (!this.isDrawing || !this.studioTool || this.studioTool === 'text') return;
+    
+    // Redraw canvas and show preview
+    this.redrawStudioCanvas();
+    
+    // Draw preview shape
+    const ctx = this.studioCanvasContext;
+    ctx.strokeStyle = this.studioStrokeColor;
+    ctx.fillStyle = this.studioFillColor;
+    ctx.lineWidth = this.studioStrokeWidth;
+    
+    switch (this.studioTool) {
+      case 'box':
+        ctx.strokeRect(
+          Math.min(this.startX, currentX),
+          Math.min(this.startY, currentY),
+          Math.abs(currentX - this.startX),
+          Math.abs(currentY - this.startY)
+        );
+        break;
+      case 'circle':
+        const radius = Math.sqrt(
+          Math.pow(currentX - this.startX, 2) + Math.pow(currentY - this.startY, 2)
+        );
+        ctx.beginPath();
+        ctx.arc(this.startX, this.startY, radius, 0, 2 * Math.PI);
+        ctx.stroke();
+        break;
+      case 'arrow':
+        this.drawArrow(ctx, this.startX, this.startY, currentX, currentY);
+        break;
+    }
+  }
+
+  /**
+   * Handle canvas mouse up
+   */
+  onStudioCanvasMouseUp(event: MouseEvent) {
+    // Handle text drag end
+    if (this.isDraggingText) {
+      this.isDraggingText = false;
+      this.saveStudioState();
+      return;
+    }
+    
+    if (!this.isDrawing) return;
+    
+    // Try to find canvas element
+    let canvas: HTMLCanvasElement | null = null;
+    if (this.studioCanvasRef?.nativeElement) {
+      canvas = this.studioCanvasRef.nativeElement;
+    } else {
+      const canvasElement = document.querySelector('.studio-canvas-element') as HTMLCanvasElement;
+      if (canvasElement) {
+        canvas = canvasElement;
+      }
+    }
+    
+    if (!canvas) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    // Calculate scale factor between display size and actual canvas size
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    // Get mouse position relative to canvas
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+    
+    // Scale to canvas coordinates
+    const endX = mouseX * scaleX;
+    const endY = mouseY * scaleY;
+    
+    // Save shape
+    const shape: any = {
+      type: this.studioTool,
+      startX: this.startX,
+      startY: this.startY,
+      endX: endX,
+      endY: endY,
+      x: Math.min(this.startX, endX),
+      y: Math.min(this.startY, endY),
+      width: endX - this.startX,
+      height: endY - this.startY,
+      strokeColor: this.studioStrokeColor,
+      fillColor: this.studioFillColor,
+      strokeWidth: this.studioStrokeWidth
+    };
+    
+    this.studioShapes.push(shape);
+    this.saveStudioState();
+    this.isDrawing = false;
+  }
+
+  /**
+   * Add text to canvas
+   */
+  confirmTextInput() {
+    if (this.newTextValue.trim()) {
+      this.addStudioText(this.pendingTextX, this.pendingTextY, this.newTextValue.trim());
+    }
+    this.closeTextInputModal();
+  }
+
+  closeTextInputModal() {
+    this.showTextInputModal = false;
+    this.newTextValue = '';
+    this.pendingTextX = 0;
+    this.pendingTextY = 0;
+  }
+
+  addStudioText(x: number, y: number, text: string) {
+    const newText = {
+      x,
+      y,
+      value: text,
+      color: this.studioTextColor,
+      fontSize: this.studioFontSize,
+      fontFamily: this.studioFontFamily
+    };
+    this.studioTexts.push(newText);
+    this.selectedTextIndex = this.studioTexts.length - 1; // Select the newly added text
+    this.studioTextValue = text; // Update the text value for inline editing
+    this.redrawStudioCanvas();
+    this.saveStudioState();
+  }
+
+  updateTextControllerPosition() {
+    if (this.selectedTextIndex === null || !this.studioCanvasRef?.nativeElement) {
+      this.textControllerPosition = null;
+      return;
+    }
+    
+    const selectedText = this.studioTexts[this.selectedTextIndex];
+    if (!selectedText) {
+      this.textControllerPosition = null;
+      return;
+    }
+
+    const canvas = this.studioCanvasRef.nativeElement;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+
+    // Calculate controller position relative to canvas
+    const textHeight = selectedText.fontSize || this.studioFontSize;
+    const controllerX = selectedText.x / scaleX;
+    const controllerY = (selectedText.y / scaleY) + textHeight + 10; // Offset below text
+
+    this.textControllerPosition = {
+      x: controllerX,
+      y: controllerY
+    };
+  }
+
+  updateSelectedText() {
+    if (this.selectedTextIndex !== null) {
+      const selectedText = this.studioTexts[this.selectedTextIndex];
+      selectedText.value = this.studioTextValue;
+      selectedText.color = this.studioTextColor;
+      selectedText.fontSize = this.studioFontSize;
+      selectedText.fontFamily = this.studioFontFamily;
+      this.redrawStudioCanvas();
+      this.saveStudioState();
+    }
+  }
+
+  deleteSelectedText() {
+    if (this.selectedTextIndex !== null) {
+      this.studioTexts.splice(this.selectedTextIndex, 1);
+      this.selectedTextIndex = null;
+      this.textControllerPosition = null;
+      this.redrawStudioCanvas();
+      this.saveStudioState();
+    }
+  }
+  
+  /**
+   * Update selected text color
+   */
+  updateSelectedTextColor() {
+    if (this.selectedTextIndex !== null && this.studioTexts[this.selectedTextIndex]) {
+      this.studioTexts[this.selectedTextIndex].color = this.studioTextColor;
+      this.redrawStudioCanvas();
+      this.saveStudioState();
+    }
+  }
+  
 
   /**
    * Toggle compare left thumbnail strip
@@ -1831,8 +3268,18 @@ export class CameraDetailComponent implements OnInit, OnDestroy, AfterViewChecke
    */
   @HostListener('document:click', ['$event'])
   onDocumentClick(event: MouseEvent) {
-    // Close date/time pickers if clicking outside
     const target = event.target as HTMLElement;
+    
+    // Close video date/time pickers if clicking outside
+    if (!target.closest('.video-date-picker-part') && !target.closest('.video-time-picker-part') && 
+        !target.closest('.compare-calendar-dropdown') && !target.closest('.compare-time-dropdown')) {
+      this.showVideoFromDatePicker = false;
+      this.showVideoToDatePicker = false;
+      this.showVideoFromTimePicker = false;
+      this.showVideoToTimePicker = false;
+    }
+    
+    // Close date/time pickers if clicking outside
     if (!target.closest('.compare-date-picker-part') && 
         !target.closest('.compare-time-picker-part') &&
         !target.closest('.compare-calendar-dropdown') &&
@@ -1857,10 +3304,17 @@ export class CameraDetailComponent implements OnInit, OnDestroy, AfterViewChecke
     }
     
     // Close main thumbnail strip if clicking outside
-    if (!target.closest('.main-slider-btn') && 
-        !target.closest('.thumbnail-strip-container') &&
-        !target.closest('.new-date-picker-wrapper')) {
-      // Keep strip open if clicking on date picker area, but close if clicking elsewhere
+    if (this.showThumbnailStrip) {
+      const isInsideStrip = target.closest('.thumbnail-strip-container');
+      const isOnSliderBtn = target.closest('.main-slider-btn');
+      const isOnDatePicker = target.closest('.new-date-picker-wrapper') || 
+                            target.closest('.main-calendar-dropdown') ||
+                            target.closest('.new-date-picker-button');
+      
+      // Close if clicking outside strip, button, and date picker
+      if (!isInsideStrip && !isOnSliderBtn && !isOnDatePicker) {
+        this.closeThumbnailStrip();
+      }
     }
   }
 }

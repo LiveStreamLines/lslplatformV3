@@ -20,7 +20,7 @@
   position: fixed;
   top: 0;
   right: 0;
-  width: 909px;
+  width: 85%;
   height: 100%;
   z-index: 1001;
   pointer-events: none;
@@ -36,9 +36,9 @@
 
 .overlay-content-wrapper {
   position: relative;
-  width: 909px;
+  width: 100%;
   height: 100%;
-  background: #ffffff;
+  backdrop-filter: blur(10px);
   padding: 30px;
   display: flex;
   flex-direction: column;
@@ -46,7 +46,17 @@
   transform: translateX(100%);
   transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15);
-  overflow: hidden;
+  overflow: visible;
+}
+
+.overlay-content-wrapper::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(225deg, var(--gradient-start) 0%, var(--gradient-end) 25%);
+  opacity: 0.6;
+  z-index: -1;
+  pointer-events: none;
 }
 
 .overlay-panel.open .overlay-content-wrapper {
@@ -97,9 +107,10 @@
   flex: 1;
   width: 100%;
   overflow-y: auto;
-  overflow-x: hidden;
+  overflow-x: visible;
   background: transparent;
   min-height: 0;
+  position: relative;
 }
 
 /* Override projects grid to show 3 cards per row */
@@ -200,8 +211,14 @@
   display: flex;
   flex-direction: column;
   height: 320px;
-  background: #ffffff;
-  box-shadow: none;
+  background: linear-gradient(225deg, var(--gradient-start) 0%, var(--gradient-end) 25%);
+  box-shadow: 6px 6px 54px rgba(0, 0, 0, 0.05);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.overlay-content ::ng-deep .project-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 8px 8px 60px rgba(0, 0, 0, 0.1);
 }
 
 .overlay-content ::ng-deep .card-header {
@@ -236,22 +253,46 @@
 
 .overlay-content ::ng-deep .card-actions {
   order: 3;
-  padding: 0;
+  padding: 8px 0 0 0;
   border-top: none;
   justify-content: space-between;
-  gap: 0;
+  gap: 4px;
+  align-items: center;
 }
 
 .overlay-content ::ng-deep .action-btn {
-  width: 20px;
-  height: 20px;
+  width: 32px;
+  height: 32px;
   background: transparent;
-  border-radius: 0;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  padding: 0;
+}
+
+.overlay-content ::ng-deep .action-btn:hover {
+  background: #f6f2ff;
+  border-color: #e3e8ef;
+}
+
+.overlay-content ::ng-deep .action-btn.active {
+  background: #f6f2ff;
+  border-color: var(--primary-color);
 }
 
 .overlay-content ::ng-deep .action-icon-img {
   width: 20px;
   height: 20px;
+  object-fit: contain;
+  transition: transform 0.3s ease;
+}
+
+.overlay-content ::ng-deep .action-btn:hover .action-icon-img {
+  transform: scale(1.1);
 }
 
 /* Update active indicator tooltip */
@@ -263,6 +304,8 @@
   margin-bottom: 3px;
   font-size: 14px;
   line-height: 1.5;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
 }
 
 .overlay-content ::ng-deep .active-indicator::after {
@@ -273,6 +316,65 @@
 .overlay-content ::ng-deep .indicator-text {
   font-weight: 600;
   color: #ffffff;
+}
+
+/* Service Tooltip Styles */
+.overlay-content ::ng-deep .service-tooltip {
+  position: absolute;
+  top: 100%;
+  margin-top: 3px;
+  z-index: 10000;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.overlay-content ::ng-deep .tooltip-arrow {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  width: 0;
+  height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-top: 13px solid #110038;
+  border-bottom: none;
+  z-index: 1;
+}
+
+.overlay-content ::ng-deep .tooltip-content {
+  background: #110038;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 8px;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  position: relative;
+}
+
+.overlay-content ::ng-deep .tooltip-text {
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: #ffffff;
+  white-space: nowrap;
+}
+
+.overlay-content ::ng-deep .tooltip-badge {
+  background: #00b330;
+  color: #f6f2ff;
+  padding: 0 10px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 60px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.55px;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .overlay-content ::ng-deep .active-badge {

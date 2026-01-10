@@ -438,6 +438,37 @@
   align-items: center;
 }
 
+.camera-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.camera-header-left .back-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid #e3e8ef;
+  border-radius: 8px;
+  background: #ffffff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.camera-header-left .back-btn:hover {
+  background: #f9fafb;
+  border-color: #c4b5fd;
+}
+
+.camera-header-left .back-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
 .camera-count {
   font-size: 24px;
   font-weight: 600;
@@ -586,6 +617,12 @@
   background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
   background-size: 200px 100%;
   animation: skeleton-loading 1.5s ease-in-out infinite;
+}
+
+.camera-image.no-image,
+.main-image.no-image {
+  object-fit: contain;
+  background: #f9fafb;
 }
 
 .loading-spinner {
@@ -1348,5 +1385,216 @@
   margin: 4px 0;
   font-size: 14px;
   color: #4b5565;
+}
+
+/* Map View Styles */
+.map-view-container {
+  position: relative;
+  width: 100%;
+  height: 541px;
+  border: 4px solid #ffffff;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #f5f5f5;
+}
+
+.project-map {
+  width: 100%;
+  height: 100%;
+}
+
+.map-theme-selector {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1000;
+  background: white;
+  padding: 8px 12px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.map-theme-selector label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #121926;
+  margin: 0;
+}
+
+.theme-select {
+  padding: 6px 12px;
+  border: 1px solid #e3e8ef;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #121926;
+  background: white;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.3s ease;
+}
+
+.theme-select:hover {
+  border-color: var(--primary-color);
+}
+
+.theme-select:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(86, 33, 210, 0.1);
+}
+
+/* Leaflet map styling for project map */
+:host ::ng-deep .project-map .leaflet-container {
+  width: 100%;
+  height: 100%;
+  background: #e5e7eb;
+}
+
+:host ::ng-deep .project-map-marker {
+  background: transparent;
+  border: none;
+}
+
+/* Camera Thumbnail Card Overlay */
+.camera-thumbnail-card {
+  position: absolute;
+  width: 314.667px;
+  border: 2px solid #ffffff;
+  border-radius: 16px;
+  padding: 16px;
+  background: #ffffff;
+  box-shadow: 4px 6px 15px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  pointer-events: auto;
+}
+
+.camera-thumbnail-card .camera-status-badge {
+  position: absolute;
+  top: -2px;
+  right: -2.33px;
+  padding: 10px 16px;
+  border-radius: 0 0 0 12px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: 'Inter', sans-serif;
+  color: #ffffff;
+  text-transform: uppercase;
+  letter-spacing: 0.55px;
+  line-height: 1.5;
+  z-index: 2;
+}
+
+.camera-thumbnail-card .camera-name {
+  font-size: 20px;
+  font-weight: 600;
+  font-family: 'Inter', sans-serif;
+  color: #121926;
+  margin: 0;
+  line-height: 1.3;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.camera-thumbnail-card .camera-image-container {
+  position: relative;
+  width: 100%;
+  height: 160px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.camera-thumbnail-card .camera-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.camera-thumbnail-card .quick-view-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(54, 9, 158, 0.7) 0%, rgba(17, 0, 56, 0.7) 100%);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+.camera-thumbnail-card .quick-view-btn {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 16px;
+  height: 40px;
+  background: #ffffff;
+  border: 2px solid #f6f2ff;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 400;
+  font-family: 'Inter', sans-serif;
+  color: #5621d2;
+  line-height: 1.5;
+  transition: all 0.3s ease;
+}
+
+.camera-thumbnail-card .quick-view-btn:hover {
+  background: #f6f2ff;
+}
+
+.camera-thumbnail-card .camera-details {
+  display: flex;
+  gap: 12px;
+}
+
+.camera-thumbnail-card .detail-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.camera-thumbnail-card .detail-label {
+  font-size: 14px;
+  font-weight: 600;
+  font-family: 'Inter', sans-serif;
+  color: #121926;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.camera-thumbnail-card .detail-value {
+  font-size: 13px;
+  font-weight: 400;
+  font-family: 'Inter', sans-serif;
+  color: #4b5565;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.camera-thumbnail-card .view-details-btn {
+  width: 100%;
+  height: 40px;
+  padding: 10px 16px;
+  background: #5621d2;
+  border: 2px solid #f6f2ff;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 400;
+  font-family: 'Inter', sans-serif;
+  color: #ffffff;
+  line-height: 1.5;
+  transition: all 0.3s ease;
+}
+
+.camera-thumbnail-card .view-details-btn:hover {
+  background: #4a1bb8;
 }
 

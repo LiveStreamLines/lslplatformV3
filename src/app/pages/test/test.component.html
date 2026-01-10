@@ -1,0 +1,131 @@
+<div class="test-container">
+  <h1>Test Component</h1>
+
+  <div class="dropdowns-section">
+    <!-- Developer Dropdown -->
+    <div class="dropdown-group">
+      <label for="developerSelect">Developer:</label>
+      <select 
+        id="developerSelect" 
+        [(ngModel)]="selectedDeveloperId" 
+        (change)="onDeveloperChange()"
+        class="dropdown">
+        <option value="">Select Developer</option>
+        <option *ngFor="let developer of developers" [value]="developer.id">
+          {{ developer.name }}
+        </option>
+      </select>
+    </div>
+
+    <!-- Project Dropdown -->
+    <div class="dropdown-group">
+      <label for="projectSelect">Project:</label>
+      <select 
+        id="projectSelect" 
+        [(ngModel)]="selectedProjectId" 
+        (change)="onProjectChange()"
+        class="dropdown"
+        [disabled]="!selectedDeveloperId">
+        <option value="">Select Project</option>
+        <option *ngFor="let project of projects" [value]="project.id">
+          {{ project.name }}
+        </option>
+      </select>
+    </div>
+
+    <!-- Camera Dropdown -->
+    <div class="dropdown-group">
+      <label for="cameraSelect">Camera:</label>
+      <select 
+        id="cameraSelect" 
+        [(ngModel)]="selectedCameraId" 
+        (change)="onCameraChange()"
+        class="dropdown"
+        [disabled]="!selectedProjectId">
+        <option value="">Select Camera</option>
+        <option *ngFor="let camera of cameras" [value]="camera.id">
+          {{ camera.name }}
+        </option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Calendar Section -->
+  <div class="calendar-section" *ngIf="selectedCameraId">
+    <div *ngIf="isLoadingDates" class="loading-message">Loading available dates...</div>
+    
+    <div class="calendar-container" *ngIf="!isLoadingDates">
+      <div *ngFor="let month of getMonths()" class="month-calendar">
+        <h3 class="month-title">{{ getMonthName(month) }}</h3>
+        <div class="calendar-grid">
+          <div class="calendar-header">
+            <div class="day-header" *ngFor="let day of ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']">
+              {{ day }}
+            </div>
+          </div>
+          <div class="calendar-body">
+            <div 
+              *ngFor="let day of getDaysInMonth(month); let i = index"
+              class="calendar-day"
+              [class.empty]="day.getMonth() !== month.getMonth()"
+              [class.available]="day.getMonth() === month.getMonth() && isDateAvailable(day)"
+              [class.selected]="day.getMonth() === month.getMonth() && formatDate(day) === selectedDate"
+              [class.today]="day.getMonth() === month.getMonth() && isToday(day)"
+              (click)="day.getMonth() === month.getMonth() && isDateAvailable(day) && onDateSelect(formatDate(day))">
+              <span *ngIf="day.getMonth() === month.getMonth()">{{ day.getDate() }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Images Section -->
+  <div class="images-section" *ngIf="selectedDate">
+    <div class="section-header">
+      <h2>Images for {{ selectedDate }}</h2>
+      <span class="cache-badge" *ngIf="isCached(selectedDate)" title="Loaded from cache">⚡ Cached</span>
+    </div>
+    
+    <!-- Loading State -->
+    <div *ngIf="isLoading" class="loading-state">
+      <div class="loading-spinner"></div>
+      <p>Loading images...</p>
+    </div>
+    
+    <!-- Progress Indicator -->
+    <div *ngIf="!isLoading && images.length > 0 && loadedImageCount < totalImageCount" class="progress-indicator">
+      <div class="progress-bar">
+        <div class="progress-fill" [style.width.%]="getLoadingProgress()"></div>
+      </div>
+      <p class="progress-text">Loading images: {{ loadedImageCount }} / {{ totalImageCount }} ({{ getLoadingProgress() }}%)</p>
+    </div>
+    
+    <!-- No Images State -->
+    <div *ngIf="!isLoading && images.length === 0" class="no-images">
+      <div class="no-images-icon">📷</div>
+      <p>No images found for this date.</p>
+    </div>
+    
+    <!-- Images Grid -->
+    <div class="images-grid" *ngIf="!isLoading && images.length > 0">
+      <div *ngFor="let image of images; let i = index" class="image-item" [class.loaded]="isImagePreloaded(image)">
+        <img 
+          [src]="image" 
+          [alt]="'Image ' + (i + 1) + ' for ' + selectedDate" 
+          (error)="onImageError($event)"
+          (load)="onImageLoad($event)"
+          loading="lazy"
+          [class.fade-in]="isImagePreloaded(image)">
+        <div class="image-overlay">
+          <span class="image-number">{{ i + 1 }} / {{ images.length }}</span>
+        </div>
+        <!-- Loading placeholder -->
+        <div *ngIf="!isImagePreloaded(image)" class="image-placeholder">
+          <div class="placeholder-spinner"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+

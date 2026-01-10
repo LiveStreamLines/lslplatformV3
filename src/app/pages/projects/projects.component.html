@@ -1,7 +1,8 @@
 <div class="projects-page">
   <div class="page-header">
     <div class="breadcrumb">
-      <span class="breadcrumb-item clickable" (click)="navigateToAllProjects()">Clients</span>
+      <img *ngIf="communityImage" [src]="communityImage" [alt]="selectedCategory" class="breadcrumb-logo clickable" (click)="navigateToAllProjects()" />
+      <img *ngIf="!communityImage" src="assets/images/lsl.svg" alt="Clients" class="breadcrumb-logo clickable" (click)="navigateToAllProjects()" />
       <span class="breadcrumb-separator">|</span>
       <span class="breadcrumb-item active">{{ selectedCategory }}</span>
     </div>
@@ -52,21 +53,21 @@
       
       <div class="card-image-container">
         <img [src]="project.image" [alt]="project.name" class="project-image" />
-        <span class="status-badge">{{ project.status }}</span>
+        <span class="status-badge" [class.status-in-progress]="project.status?.toLowerCase() === 'in progress'" [class.status-completed]="project.status?.toLowerCase() === 'completed'">{{ project.status?.toLowerCase() === 'in progress' ? 'Active' : (project.status?.toLowerCase() === 'completed' ? 'Completed' : project.status) }}</span>
         <div class="card-progress">
           <div class="progress-info">
-            <span class="progress-text">{{ project.daysCompleted }} Days Completed</span>
+            <span class="progress-text">{{ project.daysCompleted || 0 }} Days Completed</span>
           </div>
           <div class="progress-bar-container">
             <div class="progress-bar">
               <div 
                 class="progress-fill"
-                [style.width.%]="getProgressPercentage(project.daysCompleted, project.totalDays)">
+                [style.width.%]="getProgressPercentage(project.daysCompleted || 0, project.totalDays || 1095)">
               </div>
             </div>
             <div class="progress-labels">
               <span>0</span>
-              <span>{{ project.totalDays }}</span>
+              <span>{{ project.totalDays || 1095 }}</span>
             </div>
           </div>
         </div>
@@ -81,7 +82,7 @@
           (click)="$event.stopPropagation()"
           (mouseenter)="onServiceHover(project.id, 'timelapse', $event)"
           (mouseleave)="onServiceLeave()">
-          <img [src]="getServiceStatus(project.id, 'timelapse') ? icons.clock.enable : icons.clock.disable" alt="Time laps" class="action-icon-img" />
+          <img [src]="icons.timelapse.disable" alt="Time laps" class="action-icon-img timelapse-icon" />
           <div 
             class="service-tooltip" 
             *ngIf="isServiceHovered(project.id, 'timelapse') && getServiceStatus(project.id, 'timelapse')"
@@ -102,7 +103,7 @@
           (click)="$event.stopPropagation()"
           (mouseenter)="onServiceHover(project.id, 'live', $event)"
           (mouseleave)="onServiceLeave()">
-          <img [src]="getServiceStatus(project.id, 'live') ? icons.live.enable : icons.live.disable" alt="Live" class="action-icon-img" />
+          <img [src]="icons.live.disable" alt="Live" class="action-icon-img live-icon" />
           <div 
             class="service-tooltip" 
             *ngIf="isServiceHovered(project.id, 'live') && getServiceStatus(project.id, 'live')"
@@ -123,7 +124,7 @@
           (click)="$event.stopPropagation()"
           (mouseenter)="onServiceHover(project.id, 'drone', $event)"
           (mouseleave)="onServiceLeave()">
-          <img [src]="getServiceStatus(project.id, 'drone') ? icons.drone.enable : icons.drone.disable" alt="Drone" class="action-icon-img" />
+          <img [src]="icons.drone.disable" alt="Drone" class="action-icon-img" />
           <div 
             class="service-tooltip" 
             *ngIf="isServiceHovered(project.id, 'drone') && getServiceStatus(project.id, 'drone')"
@@ -144,7 +145,7 @@
           (click)="$event.stopPropagation()"
           (mouseenter)="onServiceHover(project.id, 'satellite', $event)"
           (mouseleave)="onServiceLeave()">
-          <img [src]="getServiceStatus(project.id, 'satellite') ? icons.satellite.enable : icons.satellite.disable" alt="Satellite" class="action-icon-img" />
+          <img [src]="icons.satellite.disable" alt="Satellite" class="action-icon-img" />
           <div 
             class="service-tooltip" 
             *ngIf="isServiceHovered(project.id, 'satellite') && getServiceStatus(project.id, 'satellite')"
@@ -165,7 +166,7 @@
           (click)="$event.stopPropagation()"
           (mouseenter)="onServiceHover(project.id, 'photography', $event)"
           (mouseleave)="onServiceLeave()">
-          <img [src]="getServiceStatus(project.id, 'photography') ? icons.camera.enable : icons.camera.disable" alt="Photography" class="action-icon-img" />
+          <img [src]="icons.camera.disable" alt="Photography" class="action-icon-img" />
           <div 
             class="service-tooltip" 
             *ngIf="isServiceHovered(project.id, 'photography') && getServiceStatus(project.id, 'photography')"
@@ -182,7 +183,56 @@
   </div>
 
   <div class="map-view" *ngIf="viewMode === 'map'">
+    <div class="map-theme-selector">
+      <label for="theme-select">Map Theme:</label>
+      <select id="theme-select" [(ngModel)]="mapTheme" (change)="setMapTheme(mapTheme)" class="theme-select">
+        <option *ngFor="let themeKey of getThemeKeys()" [value]="themeKey">
+          {{ availableThemes[themeKey].name }}
+        </option>
+      </select>
+    </div>
     <div #mapContainer class="map-container"></div>
+    
+    <!-- Camera Thumbnail Card Overlay -->
+    <div class="camera-thumbnail-card" *ngIf="selectedMapCamera" [style.left.px]="thumbnailCardPosition.x" [style.top.px]="thumbnailCardPosition.y">
+      <div class="camera-status-badge" [class]="'status-' + selectedMapCamera.status.toLowerCase()">
+        {{ selectedMapCamera.status }}
+      </div>
+      
+      <h3 class="camera-name">
+        {{ selectedMapCamera.name }}
+        <span class="status-dot active">•</span>
+      </h3>
+      
+      <div class="camera-image-container">
+        <img 
+          *ngIf="selectedMapCamera.image"
+          [src]="selectedMapCamera.image" 
+          [alt]="selectedMapCamera.name" 
+          class="camera-image"
+        />
+        <div *ngIf="!selectedMapCamera.image" class="image-loading-placeholder skeleton-image"></div>
+        <div class="quick-view-overlay">
+          <button class="quick-view-btn" (click)="navigateToCamera(selectedMapCamera.id, $event)">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M8 3C4.5 3 1.73 5.11 0 8C1.73 10.89 4.5 13 8 13C11.5 13 14.27 10.89 16 8C14.27 5.11 11.5 3 8 3ZM8 11C6.34 11 5 9.66 5 8C5 6.34 6.34 5 8 5C9.66 5 11 6.34 11 8C11 9.66 9.66 11 8 11Z" fill="#5621d2"/>
+            </svg>
+            <span>Quick View</span>
+          </button>
+        </div>
+      </div>
+      
+      <div class="camera-details">
+        <div class="detail-item">
+          <p class="detail-label">Installed on</p>
+          <p class="detail-value">{{ selectedMapCamera.installedDate || 'N/A' }}</p>
+        </div>
+        <div class="detail-item">
+          <p class="detail-label">Last Photo</p>
+          <p class="detail-value">{{ selectedMapCamera.lastPhotoDate || 'N/A' }}</p>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 

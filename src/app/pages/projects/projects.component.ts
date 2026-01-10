@@ -1,18 +1,22 @@
 import { Component, Input, OnInit, OnChanges, AfterViewInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router, ActivatedRoute } from '@angular/router';
+import { FormsModule } from '@angular/forms';
+import { RouterModule, Router, ActivatedRoute } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { forkJoin, of } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
 import * as L from 'leaflet';
-import { PROJECT_IMAGE, ICONS } from '../../constants/figma-assets';
+import { PROJECT_IMAGE, ICONS, COMMUNITY_IMAGES } from '../../constants/figma-assets';
 import { ProjectsService } from '../../services/projects.service';
 import { ServiceConfigService, ServiceConfig } from '../../services/service-config.service';
 import { CommunitiesService } from '../../services/communities.service';
 import { CamerasService } from '../../services/cameras.service';
+import { CameraPicsService } from '../../services/camera-pics.service';
+import { CameraPicsCacheService } from '../../services/camera-pics-cache.service';
 import { Project } from '../../models/project.model';
 import { Camera } from '../../models/camera.model';
 import { API_CONFIG } from '../../config/api.config';
+import { MAP_THEMES, DEFAULT_MAP_THEME, MapTheme } from '../../config/map-themes.config';
 
 export interface ProjectServiceStatus {
   timelapse: boolean;
@@ -25,7 +29,7 @@ export interface ProjectServiceStatus {
 @Component({
   selector: 'app-projects',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule, RouterModule],
   templateUrl: './projects.component.html',
   styleUrl: './projects.component.css'
 })
@@ -35,9 +39,32 @@ export class ProjectsComponent implements OnInit, OnChanges, AfterViewInit, OnDe
   @ViewChild('mapContainer', { static: false }) mapContainer!: ElementRef;
   
   viewMode: 'list' | 'map' = 'list';
+  communityImage: string = '';
   
   icons = ICONS;
+  mapTheme: string = DEFAULT_MAP_THEME; // Current map theme
+  availableThemes = MAP_THEMES; // Available map themes
   projects: Project[] = []; // Projects for current developer (for list view)
+  
+  // Get array of theme keys for iteration
+  getThemeKeys(): string[] {
+    return Object.keys(MAP_THEMES);
+  }
+  
+  // Method to change map theme
+  setMapTheme(themeKey: string) {
+    if (MAP_THEMES[themeKey]) {
+      this.mapTheme = themeKey;
+      // Reinitialize map with new theme if map is already initialized
+      if (this.map) {
+        this.map.remove();
+        this.map = null;
+        setTimeout(() => {
+          this.initMap();
+        }, 100);
+      }
+    }
+  }
   allProjectsForMap: Project[] = []; // All projects from all developers (for map view)
   projectCameras: Map<string, Camera[]> = new Map(); // Store cameras per project
   projectServiceStatuses: Map<string, ProjectServiceStatus> = new Map();
@@ -50,6 +77,10 @@ export class ProjectsComponent implements OnInit, OnChanges, AfterViewInit, OnDe
   private map: L.Map | null = null;
   private markers: L.Marker[] = [];
   private cameraMarkers: L.Marker[] = [];
+  
+  // Camera card overlay state
+  selectedMapCamera: Camera | null = null;
+  thumbnailCardPosition: { x: number; y: number } = { x: 0, y: 0 };
 
   constructor(
     private router: Router,
@@ -58,7 +89,9 @@ export class ProjectsComponent implements OnInit, OnChanges, AfterViewInit, OnDe
     private projectsService: ProjectsService,
     private serviceConfigService: ServiceConfigService,
     private communitiesService: CommunitiesService,
-    private camerasService: CamerasService
+    private camerasService: CamerasService,
+    private cameraPicsService: CameraPicsService,
+    private cacheService: CameraPicsCacheService
   ) {}
 
   toggleView(mode: 'list' | 'map') {
@@ -92,9 +125,47 @@ export class ProjectsComponent implements OnInit, OnChanges, AfterViewInit, OnDe
     }
   }
 
+  /**
+   * Calculate project progress based on creation date
+   * Uses 3 years (1095 days) as total duration
+   */
+  private calculateProjectProgress(project: Project): { daysCompleted: number; totalDays: number } {
+    const THREE_YEARS_DAYS = 1095; // 3 years = 365 * 3 = 1095 days
+    const totalDays = THREE_YEARS_DAYS;
+
+    if (!project.createdDate) {
+      // If no creation date, return 0 progress
+      return { daysCompleted: 0, totalDays };
+    }
+
+    try {
+      // Parse creation date (assuming ISO format or YYYY-MM-DD)
+      const createdDate = new Date(project.createdDate);
+      const today = new Date();
+      
+      // Set time to midnight for accurate day calculation
+      today.setHours(0, 0, 0, 0);
+      createdDate.setHours(0, 0, 0, 0);
+
+      // Calculate days difference
+      const timeDiff = today.getTime() - createdDate.getTime();
+      const daysDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+
+      // Days completed should be between 0 and totalDays
+      const daysCompleted = Math.max(0, Math.min(daysDiff, totalDays));
+
+      return { daysCompleted, totalDays };
+    } catch (error) {
+      console.error('Error calculating project progress for project:', project.id, error);
+      return { daysCompleted: 0, totalDays };
+    }
+  }
+
   getProgressPercentage(daysCompleted: number = 0, totalDays: number = 0): number {
     if (totalDays === 0) return 0;
-    return (daysCompleted / totalDays) * 100;
+    const percentage = (daysCompleted / totalDays) * 100;
+    // Ensure percentage is between 0 and 100
+    return Math.max(0, Math.min(100, percentage));
   }
 
   navigateToProject(projectId: string) {
@@ -107,6 +178,11 @@ export class ProjectsComponent implements OnInit, OnChanges, AfterViewInit, OnDe
   }
 
   ngOnInit() {
+    // Initialize community image from selectedCategory if available
+    if (this.selectedCategory) {
+      this.communityImage = COMMUNITY_IMAGES[this.selectedCategory as keyof typeof COMMUNITY_IMAGES] || COMMUNITY_IMAGES['Dubai Hills Estate'] || '';
+    }
+    
     // Check for developerId in route query params first, then use @Input
     this.route.queryParams.subscribe(params => {
       if (params['developerId']) {
@@ -115,6 +191,7 @@ export class ProjectsComponent implements OnInit, OnChanges, AfterViewInit, OnDe
         this.loadCommunityName();
         this.loadProjects();
       } else if (this.developerId) {
+        this.loadCommunityName();
         this.loadProjects();
       }
     });
@@ -125,17 +202,30 @@ export class ProjectsComponent implements OnInit, OnChanges, AfterViewInit, OnDe
       this.communitiesService.getCommunityById(this.developerId).subscribe({
         next: (community) => {
           this.selectedCategory = community.name;
+          // Load community image for breadcrumb logo
+          this.communityImage = community.image || COMMUNITY_IMAGES[community.name as keyof typeof COMMUNITY_IMAGES] || COMMUNITY_IMAGES['Dubai Hills Estate'] || '';
         },
         error: (err) => {
           console.error('Error loading community name:', err);
+          // Fallback to default image based on selectedCategory
+          this.communityImage = COMMUNITY_IMAGES[this.selectedCategory as keyof typeof COMMUNITY_IMAGES] || COMMUNITY_IMAGES['Dubai Hills Estate'] || '';
         }
       });
+    } else {
+      // Fallback to default image based on selectedCategory if no developerId
+      this.communityImage = COMMUNITY_IMAGES[this.selectedCategory as keyof typeof COMMUNITY_IMAGES] || COMMUNITY_IMAGES['Dubai Hills Estate'] || '';
     }
   }
 
   ngOnChanges() {
+    // Load community image based on selectedCategory if it changes
+    if (this.selectedCategory) {
+      this.communityImage = COMMUNITY_IMAGES[this.selectedCategory as keyof typeof COMMUNITY_IMAGES] || COMMUNITY_IMAGES['Dubai Hills Estate'] || '';
+    }
+    
     // Only load if developerId is provided via @Input (not from route)
     if (this.developerId && !this.route.snapshot.queryParams['developerId']) {
+      this.loadCommunityName();
       this.loadProjects();
     }
   }
@@ -157,11 +247,16 @@ export class ProjectsComponent implements OnInit, OnChanges, AfterViewInit, OnDe
       next: ({ projects, serviceConfig }) => {
         this.serviceConfig = serviceConfig;
         
-        // Use project image or fallback to default
-        this.projects = projects.map(project => ({
-          ...project,
-          image: project.image || PROJECT_IMAGE
-        }));
+        // Use project image or fallback to default, and calculate progress based on creation date
+        this.projects = projects.map(project => {
+          const calculatedProgress = this.calculateProjectProgress(project);
+          return {
+            ...project,
+            image: project.image || PROJECT_IMAGE,
+            daysCompleted: calculatedProgress.daysCompleted,
+            totalDays: calculatedProgress.totalDays
+          };
+        });
 
         // Determine service statuses for each project
         this.updateProjectServiceStatuses();
@@ -241,7 +336,7 @@ export class ProjectsComponent implements OnInit, OnChanges, AfterViewInit, OnDe
     const card = button.closest('.project-card') as HTMLElement;
     
     if (!button || !card) {
-      return { left: '50%', transform: 'translateX(-50%)' };
+      return { left: '0', transform: 'translateX(0)' };
     }
 
     const buttonRect = button.getBoundingClientRect();
@@ -249,27 +344,15 @@ export class ProjectsComponent implements OnInit, OnChanges, AfterViewInit, OnDe
     
     // Calculate button position relative to card
     const buttonLeftRelative = buttonRect.left - cardRect.left;
-    const buttonCenterRelative = buttonLeftRelative + (buttonRect.width / 2);
     const cardWidth = cardRect.width;
     
-    // Calculate percentage position within card
-    const buttonCenterPercent = (buttonCenterRelative / cardWidth) * 100;
-    
-    // Adjust tooltip position: if button is on left side (< 30%), shift right
-    // if button is on right side (> 70%), shift left
-    let leftPercent = buttonCenterPercent;
-    
-    if (buttonCenterPercent < 30) {
-      // Left side: shift tooltip to the right
-      leftPercent = Math.max(buttonCenterPercent + 10, 20);
-    } else if (buttonCenterPercent > 70) {
-      // Right side: shift tooltip to the left
-      leftPercent = Math.min(buttonCenterPercent - 10, 80);
-    }
+    // Position tooltip to start from the left edge of the button and extend to the right
+    // This ensures it always stays inside the card
+    const leftPercent = (buttonLeftRelative / cardWidth) * 100;
     
     return {
       left: `${leftPercent}%`,
-      transform: 'translateX(-50%)'
+      transform: 'translateX(0)'
     };
   }
 
@@ -295,7 +378,23 @@ export class ProjectsComponent implements OnInit, OnChanges, AfterViewInit, OnDe
     forkJoin(cameraRequests).subscribe({
       next: (results) => {
         results.forEach(({ projectId, cameras }) => {
+          // Format installed dates and clear images initially
+          cameras.forEach(camera => {
+            if (camera.createdDate) {
+              camera.installedDate = this.formatDateString(camera.createdDate);
+            } else {
+              camera.installedDate = 'N/A';
+            }
+            camera.image = null;
+            camera.thumbnail = null;
+          });
           this.projectCameras.set(projectId, cameras);
+          
+          // Load images for cameras in this project
+          const project = this.projects.find(p => p.id === projectId);
+          if (project) {
+            this.loadCameraImagesForProject(project, cameras);
+          }
         });
         
         // Debug: Log all camera coordinates for current developer
@@ -479,10 +578,11 @@ export class ProjectsComponent implements OnInit, OnChanges, AfterViewInit, OnDe
         preferCanvas: false
       });
 
-      // Add OpenStreetMap tiles with error handling
-      const tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors',
-        maxZoom: 19,
+      // Add map tiles based on selected theme
+      const theme = MAP_THEMES[this.mapTheme] || MAP_THEMES[DEFAULT_MAP_THEME];
+      const tileLayer = L.tileLayer(theme.url, {
+        attribution: theme.attribution,
+        maxZoom: theme.maxZoom || 19,
         crossOrigin: true
       });
 
@@ -667,22 +767,19 @@ export class ProjectsComponent implements OnInit, OnChanges, AfterViewInit, OnDe
           
           const cameraMarker = L.marker(cameraPosition, { 
             icon: cameraIcon,
-            title: cameraName // Tooltip on hover
+            title: cameraName
           })
-            .addTo(this.map!)
-            .bindTooltip(cameraName, {
-              permanent: false, // Show on hover
-              direction: 'top',
-              offset: [0, -10]
-            })
-            .bindPopup(`
-              <div class="map-popup">
-                <h3>${cameraName}</h3>
-                <p>Project: ${project.name}</p>
-                <p>Status: ${camera.status || 'N/A'}</p>
-                <p>Coordinates: ${cameraLat.toFixed(6)}, ${cameraLng.toFixed(6)}</p>
-              </div>
-            `);
+            .addTo(this.map!);
+
+          // Add mouseenter handler to show camera card
+          cameraMarker.on('mouseover', () => {
+            this.onMapCameraHover(camera, cameraLat, cameraLng);
+          });
+
+          // Add mouseleave handler to hide camera card
+          cameraMarker.on('mouseout', () => {
+            this.selectedMapCamera = null;
+          });
 
           // Add click handler to navigate to camera
           cameraMarker.on('click', () => {
@@ -717,6 +814,181 @@ export class ProjectsComponent implements OnInit, OnChanges, AfterViewInit, OnDe
     console.log('Map instance:', this.map);
     console.log('Map container:', this.mapContainer?.nativeElement);
     console.log('=== End updateMap ===');
+  }
+
+  private onMapCameraHover(camera: Camera, lat: number, lng: number) {
+    this.selectedMapCamera = camera;
+    
+    // If camera image hasn't been loaded yet, load it now
+    if (!camera.image) {
+      // Find the project for this camera
+      const project = this.projects.find(p => {
+        const cameras = this.projectCameras.get(p.id) || [];
+        return cameras.some(c => c.id === camera.id);
+      });
+      
+      if (project && project.developer && project.projectTag) {
+        // Get developer tag and load image
+        this.http.get<{ developerTag: string }>(`${API_CONFIG.baseUrl}/api/developers/${project.developer}`).subscribe({
+          next: (developer) => {
+            const developerTag = developer.developerTag || '';
+            const projectTag = project.projectTag || '';
+            if (developerTag && projectTag) {
+              this.loadCameraImage(camera, developerTag, projectTag);
+            }
+          },
+          error: (err) => {
+            console.error('Error loading developer tag for hover:', err);
+          }
+        });
+      }
+    }
+    
+    // Position the thumbnail card near the hovered marker
+    // Convert lat/lng to pixel coordinates
+    if (this.map) {
+      const point = this.map.latLngToContainerPoint([lat, lng]);
+      // Position card to the left and slightly above the marker
+      this.thumbnailCardPosition = {
+        x: Math.max(20, point.x - 320), // 320px is approximately card width
+        y: Math.max(20, point.y - 200)   // Position above marker
+      };
+    }
+  }
+
+  navigateToCamera(cameraId: string, event: Event) {
+    event.stopPropagation();
+    this.router.navigate(['/camera', cameraId]);
+  }
+
+  /**
+   * Load camera images for a project
+   */
+  private loadCameraImagesForProject(project: Project, cameras: Camera[]) {
+    if (!project.developer || !project.projectTag) {
+      return;
+    }
+
+    // Get developer tag
+    this.http.get<{ developerTag: string }>(`${API_CONFIG.baseUrl}/api/developers/${project.developer}`).subscribe({
+      next: (developer) => {
+        const developerTag = developer.developerTag || '';
+        const projectTag = project.projectTag || '';
+        
+        if (!developerTag || !projectTag) {
+          return;
+        }
+
+        // Load images for each camera
+        cameras.forEach(camera => {
+          this.loadCameraImage(camera, developerTag, projectTag);
+        });
+      },
+      error: (err) => {
+        console.error('Error loading developer tag:', err);
+      }
+    });
+  }
+
+  /**
+   * Load image for a single camera
+   */
+  private loadCameraImage(camera: Camera, developerTag: string, projectTag: string) {
+    const cameraTag = camera.camera || '';
+    if (!cameraTag) return;
+
+    // Check cache first
+    const cachedTimestamp = this.cacheService.getLastPhoto(developerTag, projectTag, cameraTag);
+    
+    if (cachedTimestamp) {
+      const imageUrl = this.cameraPicsService.getProxiedImageUrl(developerTag, projectTag, cameraTag, cachedTimestamp);
+      // Preload image
+      const img = new Image();
+      img.onload = () => {
+        camera.image = imageUrl;
+        camera.thumbnail = imageUrl;
+        camera.lastPhotoDate = this.formatTimestampToDate(cachedTimestamp);
+      };
+      img.onerror = () => {
+        camera.image = null;
+        camera.thumbnail = null;
+      };
+      img.src = imageUrl;
+      return;
+    }
+
+    // Cache miss - fetch from API
+    this.cameraPicsService.getCameraPictures(developerTag, projectTag, cameraTag).subscribe({
+      next: (response) => {
+        if (response.lastPhoto) {
+          // Cache the timestamp
+          this.cacheService.setLastPhoto(developerTag, projectTag, cameraTag, response.lastPhoto);
+          
+          const imageUrl = this.cameraPicsService.getProxiedImageUrl(developerTag, projectTag, cameraTag, response.lastPhoto);
+          
+          // Preload image
+          const img = new Image();
+          img.onload = () => {
+            camera.image = imageUrl;
+            camera.thumbnail = imageUrl;
+            camera.lastPhotoDate = this.formatTimestampToDate(response.lastPhoto);
+          };
+          img.onerror = () => {
+            camera.image = null;
+            camera.thumbnail = null;
+          };
+          img.src = imageUrl;
+        } else {
+          camera.image = null;
+          camera.thumbnail = null;
+          camera.lastPhotoDate = 'N/A';
+        }
+      },
+      error: (err) => {
+        console.warn(`Failed to load image for camera ${camera.id}:`, err);
+        camera.image = null;
+        camera.thumbnail = null;
+        camera.lastPhotoDate = 'N/A';
+      }
+    });
+  }
+
+  /**
+   * Format timestamp (YYYYMMDDHHMMSS) to date string (DD-MMM-YYYY)
+   */
+  formatTimestampToDate(timestamp: string): string {
+    if (!timestamp || timestamp.length < 8) return 'N/A';
+    
+    const year = timestamp.substring(0, 4);
+    const month = timestamp.substring(4, 6);
+    const day = timestamp.substring(6, 8);
+    
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthIndex = parseInt(month, 10) - 1;
+    const monthName = months[monthIndex] || month;
+    
+    return `${day}-${monthName}-${year}`;
+  }
+
+  /**
+   * Format date string (ISO or other format) to DD-MMM-YYYY
+   */
+  formatDateString(dateStr: string): string {
+    if (!dateStr) return 'N/A';
+    
+    try {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return 'N/A';
+      
+      const day = String(date.getDate()).padStart(2, '0');
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const month = months[date.getMonth()];
+      const year = date.getFullYear();
+      
+      return `${day}-${month}-${year}`;
+    } catch (error) {
+      return 'N/A';
+    }
   }
 }
 

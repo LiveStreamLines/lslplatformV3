@@ -31,12 +31,18 @@ export class CameraPicsService {
    * @param developerTag - Developer tag (not ID)
    * @param projectTag - Project tag (not ID)
    * @param cameraTag - Camera tag (camera name, not ID)
+   * @param date1 - Optional start date filter in YYYYMMDD format
+   * @param date2 - Optional end date filter in YYYYMMDD format
    */
-  getCameraPictures(developerTag: string, projectTag: string, cameraTag: string): Observable<CameraPicturesResponse> {
+  getCameraPictures(developerTag: string, projectTag: string, cameraTag: string, date1?: string, date2?: string): Observable<CameraPicturesResponse> {
     const url = `${getApiUrl('/api/camerapics-s3-test')}/${developerTag}/${projectTag}/${cameraTag}/pictures/`;
     
-    // POST request with empty body (date filters are optional)
-    return this.http.post<CameraPicturesResponse>(url, {}).pipe(
+    // POST request with optional date filters
+    const body: any = {};
+    if (date1) body.date1 = date1;
+    if (date2) body.date2 = date2;
+    
+    return this.http.post<CameraPicturesResponse>(url, body).pipe(
       catchError(error => {
         console.error('Error fetching camera pictures:', error);
         // Return empty response on error
@@ -150,6 +156,42 @@ export class CameraPicsService {
       catchError(error => {
         console.error('Error fetching today\'s images:', error);
         return of([]);
+      })
+    );
+  }
+
+  /**
+   * Get all available dates for a camera (optimized endpoint)
+   * Returns unique dates (YYYY-MM-DD format) that have images
+   * @param developerTag - Developer tag (not ID)
+   * @param projectTag - Project tag (not ID)
+   * @param cameraTag - Camera tag (camera name, not ID)
+   * @returns Observable of available dates array and metadata
+   */
+  getAvailableDates(developerTag: string, projectTag: string, cameraTag: string): Observable<{
+    availableDates: string[];
+    count: number;
+    firstDate: string | null;
+    lastDate: string | null;
+    source?: string;
+  }> {
+    const url = `${getApiUrl('/api/camerapics-s3-test')}/${developerTag}/${projectTag}/${cameraTag}/available-dates`;
+    
+    return this.http.get<{
+      availableDates: string[];
+      count: number;
+      firstDate: string | null;
+      lastDate: string | null;
+      source?: string;
+    }>(url).pipe(
+      catchError(error => {
+        console.error('Error fetching available dates:', error);
+        return of({
+          availableDates: [],
+          count: 0,
+          firstDate: null,
+          lastDate: null
+        });
       })
     );
   }

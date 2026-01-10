@@ -15,9 +15,14 @@ export const COMMUNITY_IMAGES = {
 
 // Project Action Icons - Using SVG icons
 export const ICONS = {
+  timelapse: {
+    enable: 'assets/images/icons/project-actions-svg/timelapse-enable.svg',
+    disable: 'assets/images/icons/project-actions-svg/timelapse-disable.svg'
+  },
+  // Keep clock as alias for backward compatibility
   clock: {
-    enable: 'assets/images/icons/project-actions-svg/clock-enable.svg',
-    disable: 'assets/images/icons/project-actions-svg/clock-disable.svg'
+    enable: 'assets/images/icons/project-actions-svg/timelapse-enable.svg',
+    disable: 'assets/images/icons/project-actions-svg/timelapse-disable.svg'
   },
   live: {
     enable: 'assets/images/icons/project-actions-svg/live-enable.svg',
